@@ -15,8 +15,6 @@ Python prepares the files and runs the container for you.
 
 ## Table of contents
 
-- [What changed in 2.5.0](#what-changed-in-250)
-- [What changed in 2.0.0](#what-changed-in-200)
 - [Installation](#installation)
 - [Quick start](#quick-start)
 - [Choosing a workflow](#choosing-a-workflow)
@@ -25,74 +23,8 @@ Python prepares the files and runs the container for you.
 - [Legacy MATLAB implementation](#legacy-matlab-implementation)
 - [Reproducibility and validation](#reproducibility-and-validation)
 - [Licence](#licence)
+- [Changelog](#changelog)
 - [Citation](#citation)
-
-## What changed in 2.5.0
-
-- **SPM now uses multiple threads.** The MATLAB Runtime in the SPM container
-  started with a single thread, so SPM used one core however many the machine
-  had. Every SPM step now runs with at least 8 threads, and up to 16 when the
-  machine has more cores. Use `--threads N` (or `threads=N` in Python) to choose
-  a different number.
-- **New `--engine` option.** Choose `docker` or `apptainer`. Use Apptainer on HPC
-  systems, where Docker is usually unavailable.
-- **Singularity is no longer a separate runtime.** Use Apptainer. In Python, use
-  `runtime="apptainer"`, and note that `SINGULARITY_IMAGE` is now `SIF_IMAGE`.
-- **Internal modules were reorganised.** Import the four workflow functions from
-  `presurfer`. The modules `presurfer.spm_workflows` and `presurfer.public_api`
-  no longer exist.
-
-## What changed in 2.0.0
-
-Version 2.0.0 is the first release on PyPI and a substantial rewrite of the
-`prathama` release (package version 0.1.0). The main change is that every SPM
-step now runs in a container, so the whole pipeline works without MATLAB.
-
-**Installation**
-
-- Install with `pip install presurfer`. You no longer need to clone the
-  repository.
-- Python 3.11 or later is required (the earlier release accepted 3.10).
-- You still need Docker or Apptainer, plus the SPM container image.
-  `presurfer-box --check` tells you whether they are set up correctly.
-
-**Command line**
-
-- The commands were renamed. Scripts that use the old names need updating:
-
-  | Before (`prathama`) | Now |
-  | --- | --- |
-  | `presurf_biascorrect` | `biascorrect` |
-  | `presurf_MPRAGEise` | `MPRAGEise` |
-  | `presurf_INV2` | `stripmask` |
-  | `presurf_UNI` | `brainmask` |
-
-- The interface is built with Click, so `-h` and `--help` work on every command.
-- `--check` verifies the selected container and prints the SPM version.
-- Each run writes into a new timestamped directory, so repeated runs never
-  overwrite earlier results.
-
-**Python API**
-
-- The four functions keep their names: `spm_biascorrect`, `spm_mprageise`,
-  `spm_stripmask`, and `spm_seg`. Import them from `presurfer`.
-- Each returns the `Path` of the output directory (or, for `spm_mprageise`, of
-  the MPRAGEised image). That directory now sits inside a new timestamped run
-  directory, so use the returned path instead of guessing where results went.
-- `image=` and `runtime=` are keyword-only.
-- Problems such as a missing container, a missing image, or a failed SPM job raise
-  `RuntimeError` with a message that says how to fix it.
-- Only the names imported from `presurfer` itself are public. Do not rely on the
-  internal modules.
-- The package no longer installs a top-level `scripts` module. Use
-  `presurfer.command_line:main` instead of `scripts.presurfer_box:main`.
-
-**Project**
-
-- MIT licence, citation metadata, and a changelog.
-- Automated tests and continuous integration, with releases published to PyPI.
-
-See the [changelog](CHANGELOG.md) for the complete list.
 
 ## Installation
 
@@ -318,6 +250,10 @@ presurfer commit (unlikely to happen).
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
 
 ## Citation
 
