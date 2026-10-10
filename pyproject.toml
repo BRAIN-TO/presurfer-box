@@ -30,6 +30,7 @@ dependencies = [
 ]
 
 [project.scripts]
+presurfer = "presurfer.command_line:main"
 presurfer-box = "presurfer.command_line:main"
 
 [project.urls]

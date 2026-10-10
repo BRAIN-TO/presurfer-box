@@ -223,3 +223,15 @@ def test_engine_option_validation(tmp_path: Path) -> None:
     )
     assert docker_sif.exit_code != 0
     assert "cannot be used with --engine docker" in docker_sif.output
+
+
+def test_both_command_names_are_declared() -> None:
+    import tomllib
+
+    project = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())[
+        "project"
+    ]
+    assert project["scripts"] == {
+        "presurfer": "presurfer.command_line:main",
+        "presurfer-box": "presurfer.command_line:main",
+    }

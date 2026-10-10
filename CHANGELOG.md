@@ -14,6 +14,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The command is now `presurfer`. `presurfer-box` still works as an alias.
 - `--engine docker|apptainer` option for choosing the container engine, for
   example on HPC systems.
 - `--threads` option and `threads=` keyword to set the number of MATLAB threads.

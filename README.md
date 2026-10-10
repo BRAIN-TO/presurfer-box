@@ -28,6 +28,8 @@ Python prepares the files and runs the container for you.
 
 ## Installation
 
+The command is `presurfer`. The older name `presurfer-box` also works.
+
 `presurfer-box` requires Python 3.11+ and one container runtime: Docker,
 or Apptainer. It is a standard `pyproject.toml` package, so install
 it with whichever of these you already use.
@@ -38,7 +40,7 @@ it with whichever of these you already use.
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install presurfer
-presurfer-box --help
+presurfer --help
 ```
 
 ### conda / mamba
@@ -50,7 +52,7 @@ install inside a conda or mamba environment:
 conda create -n presurfer python=3.11
 conda activate presurfer
 pip install presurfer
-presurfer-box --help
+presurfer --help
 ```
 
 (`mamba` is a drop-in replacement for `conda` in both commands above.)
@@ -78,24 +80,24 @@ Included because this project's development and CI use
 ```bash
 # from PyPI, into an isolated tool environment
 uv tool install --python 3.11 presurfer
-presurfer-box --help
+presurfer --help
 
 # from a source checkout
 cd presurfer-box
 uv sync
-uv run presurfer-box --help
+uv run presurfer --help
 ```
 
 ### The SPM container
 
 The Python package does not include SPM. Download the official container once,
-then check that `presurfer-box` can use it.
+then check that `presurfer` can use it.
 
 **Docker**
 
 ```bash
 docker pull ghcr.io/spm/spm-docker:docker-matlab-25.01.02
-presurfer-box --check
+presurfer --check
 ```
 
 **Apptainer** (for example on an HPC cluster)
@@ -104,7 +106,7 @@ presurfer-box --check
 apptainer pull --name spm.sif \
   oras://ghcr.io/spm/spm-docker:singularity-matlab-25.01.02
 
-presurfer-box --engine apptainer --sif spm.sif --check
+presurfer --engine apptainer --sif spm.sif --check
 ```
 
 A successful check prints the runtime,
@@ -114,23 +116,23 @@ the image, and the SPM version.
 
 ```bash
 # Create a bias-corrected image and bias field
-presurfer-box biascorrect IMAGE.nii
+presurfer biascorrect IMAGE.nii
 
 # Create MPRAGEised UNI
-presurfer-box MPRAGEise INV2.nii UNI.nii
+presurfer MPRAGEise INV2.nii UNI.nii
 
 # Create an INV2-derived strip mask
-presurfer-box stripmask INV2.nii
+presurfer stripmask INV2.nii
 
 # Create UNI tissue classes, brain mask, and white-matter mask
-presurfer-box brainmask UNI.nii
+presurfer brainmask UNI.nii
 ```
 
 Inputs can be `.nii` or `.nii.gz`. Docker is the default runtime. To use a local
 Apptainer image, pass `--engine apptainer --sif IMAGE` before the command:
 
 ```bash
-presurfer-box --engine apptainer --sif spm.sif stripmask INV2.nii
+presurfer --engine apptainer --sif spm.sif stripmask INV2.nii
 ```
 
 To use a different Docker image, pass `--image IMAGE` instead. `--image` and
@@ -143,19 +145,19 @@ needs a local SIF file, so `--engine apptainer` must be used with `--sif`.
 Passing `--sif` alone selects Apptainer automatically.
 
 ```bash
-presurfer-box --engine apptainer --sif spm.sif brainmask UNI.nii
+presurfer --engine apptainer --sif spm.sif brainmask UNI.nii
 ```
 
 ### Threads
 
 The MATLAB Runtime inside the SPM container starts with a single thread, so SPM
-would otherwise use one core however many the machine has. `presurfer-box` sets
+would otherwise use one core however many the machine has. `presurfer` sets
 the thread count for every SPM step. By default it uses the number of available
 cores, but never fewer than 8 and never more than 16, because extra threads stop
 helping beyond a certain point. Choose a number yourself with `--threads`:
 
 ```bash
-presurfer-box --threads 12 brainmask UNI.nii
+presurfer --threads 12 brainmask UNI.nii
 ```
 
 In Python, pass `threads=12` to any workflow function.
