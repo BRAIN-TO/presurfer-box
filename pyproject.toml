@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "presurfer"
-version = "1.0.0"
+version = "2.0.0"
 description = "MATLAB-free MP2RAGE preprocessing using SPM Standalone containers"
 readme = "README.md"
 license = "MIT"
