@@ -1,8 +1,8 @@
 """MATLAB-free presurfer workflows backed by SPM Standalone containers."""
 
-from presurfer.public_api import (
+from presurfer.presurfer_workflows import (
     IMAGE,
-    SINGULARITY_IMAGE,
+    SIF_IMAGE,
     spm_biascorrect,
     spm_mprageise,
     spm_seg,
@@ -11,7 +11,7 @@ from presurfer.public_api import (
 
 __all__ = [
     "IMAGE",
-    "SINGULARITY_IMAGE",
+    "SIF_IMAGE",
     "spm_biascorrect",
     "spm_mprageise",
     "spm_seg",

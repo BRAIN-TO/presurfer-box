@@ -1,18 +1,18 @@
 """Backward-compatible import and executable shim for presurfer-box."""
 
-from presurfer.command_line import main
-from presurfer.public_api import (
+from presurfer import (
     IMAGE,
-    SINGULARITY_IMAGE,
+    SIF_IMAGE,
     spm_biascorrect,
     spm_mprageise,
     spm_seg,
     spm_stripmask,
 )
+from presurfer.command_line import main
 
 __all__ = [
     "IMAGE",
-    "SINGULARITY_IMAGE",
+    "SIF_IMAGE",
     "main",
     "spm_biascorrect",
     "spm_mprageise",

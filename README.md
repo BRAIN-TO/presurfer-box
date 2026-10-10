@@ -1,7 +1,7 @@
-# presurfer-box [![Version](https://img.shields.io/badge/version-2.0.0-purple.svg)](https://github.com/srikash/presurfer-box/releases/tag/v2.0.0) [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE) [![CI](https://github.com/srikash/presurfer-box/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/srikash/presurfer-box/actions/workflows/ci.yml) [![DOI](https://zenodo.org/badge/1350566808.svg)](https://doi.org/10.5281/zenodo.22163094)
+# presurfer-box [![Version](https://img.shields.io/badge/version-2.5.0-purple.svg)](https://github.com/srikash/presurfer-box/releases/tag/v2.5.0) [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE) [![CI](https://github.com/srikash/presurfer-box/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/srikash/presurfer-box/actions/workflows/ci.yml) [![DOI](https://zenodo.org/badge/1350566808.svg)](https://doi.org/10.5281/zenodo.22163094)
 
 MATLAB-free MP2RAGE preprocessing for [presurfer](https://github.com/srikash/presurfer),
-using SPM Standalone in a Docker, Singularity, or Apptainer container.
+using SPM Standalone in a Docker or Apptainer container.
 
 `presurfer-box` makes the presurfer steps (bias correction, MPRAGEising, strip
 masks, and brain masks) available as a Python package and command-line tool. You
@@ -15,6 +15,7 @@ Python prepares the files and runs the container for you.
 
 ## Table of contents
 
+- [What changed in 2.5.0](#what-changed-in-250)
 - [What changed in 2.0.0](#what-changed-in-200)
 - [Installation](#installation)
 - [Quick start](#quick-start)
@@ -25,6 +26,21 @@ Python prepares the files and runs the container for you.
 - [Reproducibility and validation](#reproducibility-and-validation)
 - [Licence](#licence)
 - [Citation](#citation)
+
+## What changed in 2.5.0
+
+- **SPM now uses multiple threads.** The MATLAB Runtime in the SPM container
+  started with a single thread, so SPM used one core however many the machine
+  had. Every SPM step now runs with at least 8 threads, and up to 16 when the
+  machine has more cores. Use `--threads N` (or `threads=N` in Python) to choose
+  a different number.
+- **New `--engine` option.** Choose `docker` or `apptainer`. Use Apptainer on HPC
+  systems, where Docker is usually unavailable.
+- **Singularity is no longer a separate runtime.** Use Apptainer. In Python, use
+  `runtime="apptainer"`, and note that `SINGULARITY_IMAGE` is now `SIF_IMAGE`.
+- **Internal modules were reorganised.** Import the four workflow functions from
+  `presurfer`. The modules `presurfer.spm_workflows` and `presurfer.public_api`
+  no longer exist.
 
 ## What changed in 2.0.0
 
@@ -37,7 +53,7 @@ step now runs in a container, so the whole pipeline works without MATLAB.
 - Install with `pip install presurfer`. You no longer need to clone the
   repository.
 - Python 3.11 or later is required (the earlier release accepted 3.10).
-- You still need Docker, Singularity, or Apptainer, plus the SPM container image.
+- You still need Docker or Apptainer, plus the SPM container image.
   `presurfer-box --check` tells you whether they are set up correctly.
 
 **Command line**
@@ -63,8 +79,7 @@ step now runs in a container, so the whole pipeline works without MATLAB.
 - Each returns the `Path` of the output directory (or, for `spm_mprageise`, of
   the MPRAGEised image). That directory now sits inside a new timestamped run
   directory, so use the returned path instead of guessing where results went.
-- `image=` and `runtime=` are keyword-only, and `runtime` accepts only
-  `"docker"` or `"singularity"`.
+- `image=` and `runtime=` are keyword-only.
 - Problems such as a missing container, a missing image, or a failed SPM job raise
   `RuntimeError` with a message that says how to fix it.
 - Only the names imported from `presurfer` itself are public. Do not rely on the
@@ -82,7 +97,7 @@ See the [changelog](CHANGELOG.md) for the complete list.
 ## Installation
 
 `presurfer-box` requires Python 3.11+ and one container runtime: Docker,
-Singularity, or Apptainer. It is a standard `pyproject.toml` package, so install
+or Apptainer. It is a standard `pyproject.toml` package, so install
 it with whichever of these you already use.
 
 ### venv
@@ -151,16 +166,16 @@ docker pull ghcr.io/spm/spm-docker:docker-matlab-25.01.02
 presurfer-box --check
 ```
 
-**Singularity / Apptainer** (for example on an HPC cluster)
+**Apptainer** (for example on an HPC cluster)
 
 ```bash
-singularity pull --name spm.sif \
+apptainer pull --name spm.sif \
   oras://ghcr.io/spm/spm-docker:singularity-matlab-25.01.02
 
-presurfer-box --sif spm.sif --check
+presurfer-box --engine apptainer --sif spm.sif --check
 ```
 
-`apptainer pull` works in the same way. A successful check prints the runtime,
+A successful check prints the runtime,
 the image, and the SPM version.
 
 ## Quick start
@@ -180,14 +195,38 @@ presurfer-box brainmask UNI.nii
 ```
 
 Inputs can be `.nii` or `.nii.gz`. Docker is the default runtime. To use a local
-Singularity or Apptainer image, pass `--sif` before the command:
+Apptainer image, pass `--engine apptainer --sif IMAGE` before the command:
 
 ```bash
-presurfer-box --sif spm.sif stripmask INV2.nii
+presurfer-box --engine apptainer --sif spm.sif stripmask INV2.nii
 ```
 
 To use a different Docker image, pass `--image IMAGE` instead. `--image` and
 `--sif` cannot be combined.
+
+### Container engine
+
+`--engine` chooses between `docker` (the default) and `apptainer`. Apptainer
+needs a local SIF file, so `--engine apptainer` must be used with `--sif`.
+Passing `--sif` alone selects Apptainer automatically.
+
+```bash
+presurfer-box --engine apptainer --sif spm.sif brainmask UNI.nii
+```
+
+### Threads
+
+The MATLAB Runtime inside the SPM container starts with a single thread, so SPM
+would otherwise use one core however many the machine has. `presurfer-box` sets
+the thread count for every SPM step. By default it uses the number of available
+cores, but never fewer than 8 and never more than 16, because extra threads stop
+helping beyond a certain point. Choose a number yourself with `--threads`:
+
+```bash
+presurfer-box --threads 12 brainmask UNI.nii
+```
+
+In Python, pass `threads=12` to any workflow function.
 
 ## Choosing a workflow
 
@@ -213,11 +252,12 @@ spm_stripmask("INV2.nii")
 spm_seg("UNI.nii")
 ```
 
-Every function accepts the optional keywords `image=` and `runtime=`. For
-Singularity or Apptainer, pass the local SIF path as `image=`:
+Every function accepts the optional keywords `image=`, `runtime=`, and
+`threads=`. For
+Apptainer, pass the local SIF path as `image=`:
 
 ```python
-spm_stripmask("INV2.nii", image="spm.sif", runtime="singularity")
+spm_stripmask("INV2.nii", image="spm.sif", runtime="apptainer")
 ```
 
 `spm_biascorrect`, `spm_stripmask`, and `spm_seg` return the path of the
