@@ -1,1 +1,1 @@
-"""Implementation module retained for the Docker command-line entry point."""
+"""Compatibility module for the legacy ``scripts`` import path."""

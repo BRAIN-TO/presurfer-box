@@ -1,4 +1,4 @@
-"""MATLAB-free presurfer modules backed by SPM Standalone in Docker."""
+"""MATLAB-free presurfer workflows backed by SPM Standalone containers."""
 
 from presurfer.public_api import (
     IMAGE,

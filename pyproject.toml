@@ -1,12 +1,27 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "presurfer"
 version = "1.0.0"
-description = "MATLAB-free presurfer modules using SPM Standalone in Docker"
+description = "MATLAB-free MP2RAGE preprocessing using SPM Standalone containers"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
+authors = [{ name = "Sriranga Kashyap" }]
+keywords = ["MRI", "MP2RAGE", "SPM", "neuroimaging", "presurfer", "Docker", "Apptainer"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Typing :: Typed",
+]
 dependencies = [
     "click>=8.1",
     "nibabel>=5.0",
@@ -17,8 +32,17 @@ dependencies = [
 [project.scripts]
 presurfer-box = "presurfer.command_line:main"
 
+[project.urls]
+Homepage = "https://github.com/srikash/presurfer-box"
+Source = "https://github.com/srikash/presurfer-box"
+Issues = "https://github.com/srikash/presurfer-box/issues"
+Citation = "https://doi.org/10.5281/zenodo.22163094"
+
 [tool.setuptools]
-packages = ["presurfer", "scripts"]
+packages = ["presurfer"]
+
+[tool.setuptools.package-data]
+presurfer = ["py.typed"]
 
 [dependency-groups]
 dev = [

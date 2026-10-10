@@ -47,7 +47,17 @@ def fail(message: str) -> NoReturn:
 
 
 def utc_run_directory(parent: Path, temporary: bool = False) -> Path:
-    """Create a collision-safe UTC timestamped workflow directory."""
+    """Create a collision-safe UTC timestamped workflow directory.
+
+    Args:
+        parent: Directory that receives the new run directory.
+        temporary: Whether to prefix the name with ``tmp_`` for a stage that
+            the workflow removes afterwards.
+
+    Returns:
+        Path to the new directory. A numeric suffix is added if a directory
+        with the same timestamp already exists.
+    """
     prefix = "tmp_" if temporary else ""
     stem = f"{prefix}{datetime.now(UTC).strftime('%y%m%dT%H:%M:%S')}_presurfer"
     candidate = parent / stem
@@ -60,7 +70,14 @@ def utc_run_directory(parent: Path, temporary: bool = False) -> Path:
 
 
 def report_stage(reporter: StageReporter | None, message: str, started: float) -> None:
-    """Log and display a workflow stage with elapsed time."""
+    """Log and display a workflow stage with elapsed time.
+
+    Args:
+        reporter: Optional callback that receives the message. When it is
+            ``None``, the message is printed to the console.
+        message: Description of the stage.
+        started: Workflow start time from ``time.monotonic()``.
+    """
     rendered = f"{message} ({time.monotonic() - started:.1f}s)"
     LOGGER.info(rendered)
     if reporter is not None:
@@ -89,7 +106,7 @@ def nii_stem(path: Path) -> str:
     fail(f"Expected a .nii or .nii.gz file, got: {path}")
 
 
-def materialize_input(source: Path, output_dir: Path) -> Path:
+def materialise_input(source: Path, output_dir: Path) -> Path:
     """Copy a NIfTI input into an output directory.
 
     Compressed inputs are decompressed to ``.nii`` without modifying the
@@ -97,7 +114,7 @@ def materialize_input(source: Path, output_dir: Path) -> Path:
 
     Args:
         source: Existing ``.nii`` or ``.nii.gz`` input file.
-        output_dir: Directory that receives the materialized ``.nii`` file.
+        output_dir: Directory that receives the materialised ``.nii`` file.
 
     Returns:
         Path to the copied or decompressed ``.nii`` file.
@@ -266,6 +283,7 @@ def run_spm_batch(
         job_file: Generated SPM batch script below ``mount_root``.
         image: Docker image tag or local Singularity image path.
         runtime: ``"docker"`` or ``"singularity"``.
+        log_path: File that receives the captured standard output and error.
 
     Raises:
         RuntimeError: If the runtime or image is unavailable, or the SPM batch
@@ -426,7 +444,7 @@ def run_segmentation(
     out = run_dir / f"presurf_{kind}"
     out.mkdir()
     report_stage(reporter, f"Prepared output directory {run_dir}", started)
-    copied = materialize_input(source, out)
+    copied = materialise_input(source, out)
     mount_root = source.parent
     input_in_container = container_path(copied, mount_root)
     out_in_container = container_path(out, mount_root)
@@ -484,9 +502,9 @@ def mprageise(
     runtime: Runtime,
     reporter: StageReporter | None = None,
 ) -> Path:
-    """Create a MPRAGEised UNI image from INV2 and UNI acquisitions.
+    """Create an MPRAGEised UNI image from INV2 and UNI acquisitions.
 
-    The workflow bias-corrects INV2 with SPM, min-max normalizes the resulting
+    The workflow bias-corrects INV2 with SPM, min-max normalises the resulting
     image, and multiplies it voxelwise with UNI.
 
     Args:
@@ -524,7 +542,7 @@ def mprageise(
     output_dir = run_dir / "presurf_MPRAGEise"
     output_dir.mkdir()
     try:
-        uni_local = materialize_input(uni, output_dir)
+        uni_local = materialise_input(uni, output_dir)
         inv2_bias = bias_dir / f"{nii_stem(inv2)}_biascorrected.nii"
         uni_img = cast("nib.Nifti1Image", nib.load(str(uni_local)))
         inv2_img = cast("nib.Nifti1Image", nib.load(str(inv2_bias)))
@@ -586,7 +604,7 @@ def spm_mprageise(
     image: str = IMAGE,
     runtime: Runtime = "docker",
 ) -> Path:
-    """Create a MPRAGEised UNI image.
+    """Create an MPRAGEised UNI image.
 
     Args:
         inv2_file: Path to the INV2 ``.nii`` or ``.nii.gz`` image.
@@ -692,6 +710,7 @@ def _run_command(
 def main(ctx: click.Context, image: str | None, sif: Path | None, check_: bool) -> None:
     """Run MATLAB-free presurfer workflows through SPM Standalone.
 
+    \f
     Args:
         ctx: Click context used to pass selected runtime configuration.
         image: Optional Docker image tag.
@@ -735,7 +754,7 @@ def presurf_biascorrect(ctx: click.Context, input_file: Path) -> None:
 )
 @click.pass_context
 def presurf_mprageise(ctx: click.Context, inv2_file: Path, uni_file: Path) -> None:
-    """Create a MPRAGEised UNI image from INV2_FILE and UNI_FILE."""
+    """Create an MPRAGEised UNI image from INV2_FILE and UNI_FILE."""
     _run_command(ctx, spm_mprageise, inv2_file, uni_file)
 
 

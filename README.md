@@ -13,7 +13,14 @@ implementation remains available as a Git submodule.
 
 ## Install
 
-For the containerized Python workflows, clone the repository:
+`presurfer-box` needs Python 3.11 or later and either Docker, Singularity,
+or Apptainer. Install it from PyPI:
+
+```bash
+pip install presurfer
+```
+
+To work on the code, clone the repository instead:
 
 ```bash
 git clone https://github.com/srikash/presurfer-box.git
@@ -31,7 +38,6 @@ git submodule update --init --recursive
 
 ```bash
 docker pull ghcr.io/spm/spm-docker:docker-matlab-25.01.02
-uv sync
 presurfer-box --check
 ```
 
@@ -41,7 +47,6 @@ presurfer-box --check
 singularity pull --name spm.sif \
   oras://ghcr.io/spm/spm-docker:singularity-matlab-25.01.02
 
-uv sync
 presurfer-box --sif spm.sif --check
 ```
 
@@ -93,7 +98,7 @@ uv run pytest
 | Create a strip mask | `stripmask INV2` | `spm_stripmask()` | `*_stripmask.nii` |
 | Create UNI-derived masks | `brainmask UNI` | `spm_seg()` | Tissue classes, brain mask, and WM mask |
 
-`MPRAGEise` bias-corrects INV2, min-max normalizes the corrected INV2,
+`MPRAGEise` bias-corrects INV2, min-max normalises the corrected INV2,
 then multiplies it voxelwise with UNI. It does not run the strip-mask workflow.
 
 ## Python API
@@ -149,6 +154,10 @@ Update the submodule only when adopting a newer presurfer commit deliberately.
 - SPM runtime: SPM25 Standalone
 - Historical implementation: SPM12 with MATLAB
 - Numerical equivalence has not yet been validated with reference NIfTI data.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
 
 ## Citation
 

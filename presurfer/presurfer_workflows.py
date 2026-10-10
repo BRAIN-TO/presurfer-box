@@ -29,7 +29,7 @@ def spm_mprageise(
     image: str = IMAGE,
     runtime: Runtime = "docker",
 ) -> Path:
-    """Create a MPRAGEised UNI image from INV2 and UNI inputs."""
+    """Create an MPRAGEised UNI image from INV2 and UNI inputs."""
     return mprageise(Path(inv2_file), Path(uni_file), image, runtime)
 
 
