@@ -1,14 +1,30 @@
-# presurfer-box [![DOI](https://zenodo.org/badge/1350566808.svg)](https://doi.org/10.5281/zenodo.22163094)
+# presurfer-box [![Version](https://img.shields.io/badge/version-2.0.0-purple.svg)](https://github.com/srikash/presurfer-box/releases/tag/v2.0.0) [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE) [![CI](https://github.com/srikash/presurfer-box/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/srikash/presurfer-box/actions/workflows/ci.yml) [![DOI](https://zenodo.org/badge/1350566808.svg)](https://doi.org/10.5281/zenodo.22163094)
 
 MATLAB-free MP2RAGE preprocessing using SPM Standalone in Docker,
 Singularity, or Apptainer.
 
 `presurfer-box` provides presurfer workflows without requiring a local MATLAB
-installation or MATLAB license. It uses the [official SPM Standalone container](https://github.com/spm/spm-docker)
+installation or MATLAB licence. It uses the [official SPM Standalone container](https://github.com/spm/spm-docker)
 and retains the original MATLAB implementation as a Git submodule.
 
 > **Status:** This implementation uses SPM25 Standalone. Results have not yet
 > been numerically validated against the historical SPM12/MATLAB pipeline.
+
+## What changed in 2.0.0
+
+Version 2.0.0 is the first PyPI release. Compared with the earlier `prathama`
+release, it makes these changes:
+
+- The workflow commands are now `biascorrect`, `MPRAGEise`, `stripmask`, and
+  `brainmask`. Scripts that call the old command names need updating.
+- The command-line interface uses Click, and `--check` verifies the selected
+  container.
+- The Python API is `spm_biascorrect`, `spm_mprageise`, `spm_stripmask`, and
+  `spm_seg`.
+- The package supports Python 3.11 and later and is released under the MIT
+  licence.
+
+See the [changelog](CHANGELOG.md) for details.
 
 ## Install
 

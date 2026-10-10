@@ -6,14 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [2.0.0] - 2026-10-10
 
+### Changed
+
+- **Breaking:** the workflow commands are now `biascorrect`, `MPRAGEise`,
+  `stripmask`, and `brainmask`.
+- The package no longer installs a top-level `scripts` module.
+
 ### Added
 
-- `biascorrect`, `MPRAGEise`, `stripmask`, and `brainmask` commands, with
-  matching `spm_biascorrect`, `spm_mprageise`, `spm_stripmask`, and `spm_seg`
-  Python functions.
+- First PyPI release, published through trusted publishing.
+- Click command-line interface with a `--check` option that verifies the
+  selected container and reports the SPM version.
+- `spm_biascorrect`, `spm_mprageise`, `spm_stripmask`, and `spm_seg` Python
+  functions.
 - Docker, Singularity, and Apptainer runtimes for SPM25 Standalone.
-- `--check` option that verifies the selected container and reports the SPM
-  version.
+- MIT licence, type information (`py.typed`), and continuous integration.
 
 ### Notes
 
