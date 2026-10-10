@@ -3,32 +3,24 @@
 MATLAB-free MP2RAGE preprocessing using SPM Standalone in Docker,
 Singularity, or Apptainer.
 
-`presurfer-box` runs presurfer workflows in the
-[official SPM Standalone container](https://github.com/spm/spm-docker), so it
-does not need a local MATLAB installation or licence. The original MATLAB
-implementation remains available as a Git submodule.
+`presurfer-box` provides presurfer workflows without requiring a local MATLAB
+installation or MATLAB license. It uses the [official SPM Standalone container](https://github.com/spm/spm-docker)
+and retains the original MATLAB implementation as a Git submodule.
 
 > **Status:** This implementation uses SPM25 Standalone. Results have not yet
 > been numerically validated against the historical SPM12/MATLAB pipeline.
 
 ## Install
 
-`presurfer-box` needs Python 3.11 or later and either Docker, Singularity,
-or Apptainer. Install it from PyPI:
-
-```bash
-pip install presurfer
-```
-
-To work on the code, clone the repository instead:
+For the containerized Python workflows, clone the repository:
 
 ```bash
 git clone https://github.com/srikash/presurfer-box.git
 cd presurfer-box
 ```
 
-Fetch the pinned legacy MATLAB submodule only when you need to inspect or run
-the historical implementation:
+The legacy MATLAB source is optional. Fetch its pinned submodule only if you
+need to inspect or run the historical implementation:
 
 ```bash
 git submodule update --init --recursive
@@ -38,6 +30,7 @@ git submodule update --init --recursive
 
 ```bash
 docker pull ghcr.io/spm/spm-docker:docker-matlab-25.01.02
+python3 -m pip install .
 presurfer-box --check
 ```
 
@@ -47,6 +40,7 @@ presurfer-box --check
 singularity pull --name spm.sif \
   oras://ghcr.io/spm/spm-docker:singularity-matlab-25.01.02
 
+python3 -m pip install .
 presurfer-box --sif spm.sif --check
 ```
 
@@ -72,22 +66,16 @@ Use a local Singularity or Apptainer image with `--sif`:
 presurfer-box --sif spm.sif stripmask INV2.nii
 ```
 
-Docker is the default runtime. Use `--image IMAGE` to select another image.
+Docker is the default runtime. Override its image with `--image IMAGE`.
 
-Each run writes to a new UTC timestamped directory beside its input, for
-example `250101T12:34:56_presurfer/presurf_INV2/`. Same-second runs receive a
-numeric suffix. MPRAGEise's intermediate bias-correction directory begins
-with `tmp_` and is removed after processing.
-
-## Development
+Existing workflow output directories are protected by default. To replace one,
+pass `--clobber` before the command:
 
 ```bash
-uv sync
-uv run ruff format --check
-uv run ruff check
-uv run mypy .
-uv run pytest
+presurfer-box --clobber stripmask INV2.nii
 ```
+
+This removes and recreates that workflow's `presurf_*` output directory.
 
 ## Choose a workflow
 
@@ -98,7 +86,7 @@ uv run pytest
 | Create a strip mask | `stripmask INV2` | `spm_stripmask()` | `*_stripmask.nii` |
 | Create UNI-derived masks | `brainmask UNI` | `spm_seg()` | Tissue classes, brain mask, and WM mask |
 
-`MPRAGEise` bias-corrects INV2, min-max normalises the corrected INV2,
+`MPRAGEise` bias-corrects INV2, min-max normalizes the corrected INV2,
 then multiplies it voxelwise with UNI. It does not run the strip-mask workflow.
 
 ## Python API
@@ -117,18 +105,17 @@ All functions accept `image=` and `runtime=` keywords. Use
 
 ## Outputs
 
-Each workflow writes its output beneath a timestamped run directory beside the
-input:
+Each workflow creates an output directory beside its input:
 
 ```text
-YYMMDDThh:mm:ss_presurfer/presurf_biascorrect/
-YYMMDDThh:mm:ss_presurfer/presurf_MPRAGEise/
-YYMMDDThh:mm:ss_presurfer/presurf_INV2/
-YYMMDDThh:mm:ss_presurfer/presurf_UNI/
+presurf_biascorrect/
+presurf_MPRAGEise/
+presurf_INV2/
+presurf_UNI/
 ```
 
-Compressed `.nii.gz` inputs are supported. The source file stays unchanged and
-the workflow creates an uncompressed working copy in the output directory.
+Compressed `.nii.gz` inputs are supported. The source file is preserved; the
+workflow creates an uncompressed working copy in its output directory.
 
 ## Legacy MATLAB implementation
 
@@ -146,7 +133,8 @@ For MATLAB use:
 addpath('src/matlab/presurfer/func')
 ```
 
-Update the submodule only when adopting a newer presurfer commit deliberately.
+Update the submodule only when intentionally adopting a newer original
+presurfer commit (unlikely to happen).
 
 ## Reproducibility and validation
 
@@ -154,10 +142,6 @@ Update the submodule only when adopting a newer presurfer commit deliberately.
 - SPM runtime: SPM25 Standalone
 - Historical implementation: SPM12 with MATLAB
 - Numerical equivalence has not yet been validated with reference NIfTI data.
-
-## Licence
-
-MIT. See [LICENSE](LICENSE).
 
 ## Citation
 
