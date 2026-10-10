@@ -21,6 +21,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Breaking:** the Python functions were renamed to match the presurfer
+  branding: `spm_biascorrect`, `spm_mprageise`, `spm_stripmask`, and `spm_seg`
+  are now `presurf_biascorrect`, `presurf_mprageise`, `presurf_stripmask`, and
+  `presurf_seg`.
 - **Breaking:** the Singularity runtime was removed. Use Apptainer
   (`--engine apptainer`, or `runtime="apptainer"` in Python). The
   `SINGULARITY_IMAGE` constant is now `SIF_IMAGE`.

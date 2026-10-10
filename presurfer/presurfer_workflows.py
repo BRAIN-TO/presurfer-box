@@ -33,10 +33,10 @@ CONSOLE = Console()
 __all__ = [
     "IMAGE",
     "SIF_IMAGE",
-    "spm_biascorrect",
-    "spm_mprageise",
-    "spm_seg",
-    "spm_stripmask",
+    "presurf_biascorrect",
+    "presurf_mprageise",
+    "presurf_seg",
+    "presurf_stripmask",
 ]
 
 
@@ -299,7 +299,7 @@ def mprageise(
         report_stage(reporter, "Removed temporary bias-correction stage", started)
 
 
-def spm_biascorrect(
+def presurf_biascorrect(
     input_file: str | Path,
     *,
     image: str = IMAGE,
@@ -330,7 +330,7 @@ def spm_biascorrect(
     )
 
 
-def spm_mprageise(
+def presurf_mprageise(
     inv2_file: str | Path,
     uni_file: str | Path,
     *,
@@ -363,7 +363,7 @@ def spm_mprageise(
     )
 
 
-def spm_stripmask(
+def presurf_stripmask(
     input_file: str | Path,
     *,
     image: str = IMAGE,
@@ -394,7 +394,7 @@ def spm_stripmask(
     )
 
 
-def spm_seg(
+def presurf_seg(
     input_file: str | Path,
     *,
     image: str = IMAGE,

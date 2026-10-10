@@ -10,10 +10,10 @@ from rich.console import Console
 
 from presurfer.container_runtime import IMAGE, Container, check_container
 from presurfer.presurfer_workflows import (
-    spm_biascorrect,
-    spm_mprageise,
-    spm_seg,
-    spm_stripmask,
+    presurf_biascorrect,
+    presurf_mprageise,
+    presurf_seg,
+    presurf_stripmask,
 )
 
 CONSOLE = Console()
@@ -119,9 +119,9 @@ def main(
     "input_file", type=click.Path(exists=True, dir_okay=False, path_type=Path)
 )
 @click.pass_context
-def presurf_biascorrect(ctx: click.Context, input_file: Path) -> None:
+def cmd_biascorrect(ctx: click.Context, input_file: Path) -> None:
     """Create a bias-corrected image from INPUT_FILE."""
-    _invoke_workflow(ctx, spm_biascorrect, input_file)
+    _invoke_workflow(ctx, presurf_biascorrect, input_file)
 
 
 @main.command(name="MPRAGEise")
@@ -132,9 +132,9 @@ def presurf_biascorrect(ctx: click.Context, input_file: Path) -> None:
     "uni_file", type=click.Path(exists=True, dir_okay=False, path_type=Path)
 )
 @click.pass_context
-def presurf_mprageise(ctx: click.Context, inv2_file: Path, uni_file: Path) -> None:
+def cmd_mprageise(ctx: click.Context, inv2_file: Path, uni_file: Path) -> None:
     """Create an MPRAGEised UNI image from INV2_FILE and UNI_FILE."""
-    _invoke_workflow(ctx, spm_mprageise, inv2_file, uni_file)
+    _invoke_workflow(ctx, presurf_mprageise, inv2_file, uni_file)
 
 
 @main.command(name="stripmask")
@@ -142,9 +142,9 @@ def presurf_mprageise(ctx: click.Context, inv2_file: Path, uni_file: Path) -> No
     "input_file", type=click.Path(exists=True, dir_okay=False, path_type=Path)
 )
 @click.pass_context
-def presurf_inv2(ctx: click.Context, input_file: Path) -> None:
+def cmd_stripmask(ctx: click.Context, input_file: Path) -> None:
     """Create an INV2-derived strip mask from INPUT_FILE."""
-    _invoke_workflow(ctx, spm_stripmask, input_file)
+    _invoke_workflow(ctx, presurf_stripmask, input_file)
 
 
 @main.command(name="brainmask")
@@ -152,9 +152,9 @@ def presurf_inv2(ctx: click.Context, input_file: Path) -> None:
     "input_file", type=click.Path(exists=True, dir_okay=False, path_type=Path)
 )
 @click.pass_context
-def presurf_uni(ctx: click.Context, input_file: Path) -> None:
+def cmd_brainmask(ctx: click.Context, input_file: Path) -> None:
     """Create UNI tissue classes, brain mask, and WM mask from INPUT_FILE."""
-    _invoke_workflow(ctx, spm_seg, input_file)
+    _invoke_workflow(ctx, presurf_seg, input_file)
 
 
 if __name__ == "__main__":

@@ -166,10 +166,10 @@ In Python, pass `threads=12` to any workflow function.
 
 | Need | CLI command | Python function | Main output |
 | --- | --- | --- | --- |
-| Bias-correct an image | `biascorrect IMAGE` | `spm_biascorrect()` | Bias-corrected image and bias field |
-| Create MPRAGEised UNI | `MPRAGEise INV2 UNI` | `spm_mprageise()` | `*_MPRAGEised.nii` |
-| Create a strip mask | `stripmask INV2` | `spm_stripmask()` | `*_stripmask.nii` |
-| Create UNI-derived masks | `brainmask UNI` | `spm_seg()` | Tissue classes, brain mask, and white-matter mask |
+| Bias-correct an image | `biascorrect IMAGE` | `presurf_biascorrect()` | Bias-corrected image and bias field |
+| Create MPRAGEised UNI | `MPRAGEise INV2 UNI` | `presurf_mprageise()` | `*_MPRAGEised.nii` |
+| Create a strip mask | `stripmask INV2` | `presurf_stripmask()` | `*_stripmask.nii` |
+| Create UNI-derived masks | `brainmask UNI` | `presurf_seg()` | Tissue classes, brain mask, and white-matter mask |
 
 `MPRAGEise` bias-corrects INV2 in a temporary directory, rescales the corrected
 INV2 to the range 0 to 1, and multiplies it voxel by voxel with UNI. It does not
@@ -178,24 +178,28 @@ run the strip-mask workflow, so run `stripmask` separately if you need the mask.
 ## Python API
 
 ```python
-from presurfer import spm_biascorrect, spm_mprageise, spm_seg, spm_stripmask
+from presurfer import (
+    presurf_biascorrect,
+    presurf_mprageise,
+    presurf_seg,
+    presurf_stripmask,
+)
 
-spm_biascorrect("INV2.nii")
-spm_mprageise("INV2.nii", "UNI.nii")
-spm_stripmask("INV2.nii")
-spm_seg("UNI.nii")
+presurf_biascorrect("INV2.nii")
+presurf_mprageise("INV2.nii", "UNI.nii")
+presurf_stripmask("INV2.nii")
+presurf_seg("UNI.nii")
 ```
 
 Every function accepts the optional keywords `image=`, `runtime=`, and
-`threads=`. For
-Apptainer, pass the local SIF path as `image=`:
+`threads=`. For Apptainer, pass the local SIF path as `image=`:
 
 ```python
-spm_stripmask("INV2.nii", image="spm.sif", runtime="apptainer")
+presurf_stripmask("INV2.nii", image="spm.sif", runtime="apptainer")
 ```
 
-`spm_biascorrect`, `spm_stripmask`, and `spm_seg` return the path of the
-`presurf_*` output directory. `spm_mprageise` returns the path of the
+`presurf_biascorrect`, `presurf_stripmask`, and `presurf_seg` return the path
+of the `presurf_*` output directory. `presurf_mprageise` returns the path of the
 `*_MPRAGEised.nii` image. All of them raise `RuntimeError` if the container is
 unavailable or SPM fails.
 

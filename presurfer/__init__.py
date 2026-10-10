@@ -3,17 +3,17 @@
 from presurfer.presurfer_workflows import (
     IMAGE,
     SIF_IMAGE,
-    spm_biascorrect,
-    spm_mprageise,
-    spm_seg,
-    spm_stripmask,
+    presurf_biascorrect,
+    presurf_mprageise,
+    presurf_seg,
+    presurf_stripmask,
 )
 
 __all__ = [
     "IMAGE",
     "SIF_IMAGE",
-    "spm_biascorrect",
-    "spm_mprageise",
-    "spm_seg",
-    "spm_stripmask",
+    "presurf_biascorrect",
+    "presurf_mprageise",
+    "presurf_seg",
+    "presurf_stripmask",
 ]
