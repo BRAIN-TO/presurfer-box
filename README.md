@@ -20,6 +20,7 @@ Python prepares the files and runs the container for you.
 - [Choosing a workflow](#choosing-a-workflow)
 - [Python API](#python-api)
 - [Outputs](#outputs)
+- [Example](#example)
 - [Legacy MATLAB implementation](#legacy-matlab-implementation)
 - [Reproducibility and validation](#reproducibility-and-validation)
 - [Licence](#licence)
@@ -227,6 +228,60 @@ afterwards.
 
 Compressed `.nii.gz` inputs are supported. The source file is never changed, and
 the workflow writes an uncompressed working copy into its output directory.
+
+## Example
+
+A typical MP2RAGE preparation for FreeSurfer has four steps.
+
+### Step 0: MPRAGEise UNI
+
+```bash
+presurfer MPRAGEise INV2.nii UNI.nii
+```
+
+<img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/presurfer_step0.gif" width="400" alt="MPRAGEising the UNI image">
+
+[MPRAGEising is better than background removal ('denoising')](https://github.com/srikash/3dMPRAGEise).
+
+If you used dielectric pads, strip them now. This step is optional. See
+[PadsOff](https://github.com/srikash/faceoff/blob/master/PadsOff), which needs
+[ANTs](https://github.com/srikash/TheBeesKnees/wiki/Installing-Advanced-Normalization-Tools-(ANTs)).
+
+<img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/presurfer_step0b.gif" width="400" alt="Stripping dielectric pads">
+
+### Step 1: get a strip mask from INV2
+
+```bash
+presurfer stripmask INV2.nii
+```
+
+<img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/presurf_INV2_output.png" width="400" alt="Strip mask from INV2">
+
+### Step 2: get a brain mask from UNI
+
+```bash
+presurfer brainmask UNI.nii
+```
+
+<img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/presurf_UNI_output.png" width="400" alt="Brain mask from UNI">
+
+### Step 3: run FreeSurfer
+
+Use the INV2 strip mask to remove the non-brain parts of the MPRAGEised UNI
+image, then run `recon-all` on the stripped image:
+
+```bash
+fslmaths MPRAGEised.nii -mul stripMask.nii MPRAGEised_stripped.nii
+```
+
+Here is a fully automated segmentation with presurfer and FreeSurfer, including
+laminar surfaces:
+
+<img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/freesurfer_seg.png" width="1200" alt="FreeSurfer segmentation and laminar surfaces">
+
+<img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/drake_presurfer.jpg" width="400" alt="Drake approves of presurfer">
+
+To run only the SPM bias correction, use `presurfer biascorrect`.
 
 ## Legacy MATLAB implementation
 
