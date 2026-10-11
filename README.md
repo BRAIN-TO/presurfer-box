@@ -191,6 +191,10 @@ reuses that bias-corrected INV2 to MPRAGEise UNI, and then segments the
 MPRAGEised UNI to get the brain and white-matter masks. It checks that INV2 and
 UNI share the same voxel grid before it starts SPM.
 
+Because `recon-prep` takes the bias correction from the strip-mask segmentation
+(2 mm sampling) instead of the separate 3 mm bias correction that `MPRAGEise`
+runs, its MPRAGEised image can differ slightly from the one `MPRAGEise` makes.
+
 ## Python API
 
 ```python

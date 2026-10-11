@@ -36,7 +36,7 @@ FIXTURES = json.loads(
 BASE = "/data/run/presurf_X/scan"
 SEGMENTATIONS = 2
 NATIVE = {
-    "biascorrect": ([0] * 6, 2),
+    "biascorrect": ([0] * 6, 3),
     "UNI": ([1, 1, 1, 0, 0, 0], 2),
     "INV2": ([0, 0, 1, 1, 1, 1], 2),
 }
