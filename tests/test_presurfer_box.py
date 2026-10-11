@@ -69,9 +69,16 @@ def test_run_spm_batch_captures_output(
         ),
     )
     monkeypatch.setattr(container_runtime, "_require_docker_image", lambda _: None)
-    container_runtime.run_spm_batch(tmp_path, job, Container("docker", "image"), log)
-    assert "normal output" in log.read_text()
-    assert "normal error" in log.read_text()
+    container = Container("docker", "image")
+    container_runtime.run_spm_batch(tmp_path, job, container, log, 12)
+    container_runtime.run_spm_batch(tmp_path, job, container, log)
+    text = log.read_text()
+    assert "normal output" in text
+    assert "normal error" in text
+    assert "Container: docker image" in text
+    assert "MATLAB threads: 12" in text
+    assert "MATLAB threads: MATLAB default" in text
+    assert text.count("SPM batch: job.m") > 1
 
 
 def test_run_spm_batch_failure_points_to_log(

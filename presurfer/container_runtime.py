@@ -183,14 +183,21 @@ def run_spm_batch(
     job_file: Path,
     container: Container,
     log_path: Path,
+    threads: int | None = None,
 ) -> None:
     """Run a generated SPM batch in the selected container runtime.
+
+    Each call appends a section to the log that records the container, image,
+    and MATLAB thread count, followed by the captured output. Thread count can
+    change results in the last digits, so the log lets a run be reproduced.
 
     Args:
         mount_root: Host directory mounted at ``/data``.
         job_file: Generated SPM batch script below ``mount_root``.
         container: Runtime and image to run.
         log_path: File that receives the captured standard output and error.
+        threads: MATLAB thread count written into the batch script, recorded
+            in the log. ``None`` means the MATLAB default.
 
     Raises:
         RuntimeError: If the runtime or image is unavailable, or the SPM batch
@@ -200,9 +207,20 @@ def run_spm_batch(
         _require_docker_image(container.image)
     command = container_command(mount_root, job_file, container)
     result = subprocess.run(command, check=False, text=True, capture_output=True)
-    log_path.write_text(
-        "STDOUT\n------\n" + result.stdout + "\nSTDERR\n------\n" + result.stderr
+    header = (
+        f"SPM batch: {job_file.name}\n"
+        f"Container: {container.runtime} {container.image}\n"
+        f"MATLAB threads: {threads if threads is not None else 'MATLAB default'}\n\n"
     )
+    with log_path.open("a") as log:
+        log.write(
+            header
+            + "STDOUT\n------\n"
+            + result.stdout
+            + "\nSTDERR\n------\n"
+            + result.stderr
+            + "\n"
+        )
     if result.returncode:
         raise RuntimeError(
             f"SPM batch failed ({container.runtime} exit status {result.returncode}). "

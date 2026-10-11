@@ -162,6 +162,11 @@ presurfer --threads 12 brainmask UNI.nii
 
 In Python, pass `threads=12` to any workflow function.
 
+The thread count can change results in the last digits, although a fixed count
+always gives identical results. `spm.log` records the container, image, and
+thread count of every step, so you can reproduce a run by passing the same
+`--threads` value.
+
 ## Choosing a workflow
 
 | Need | CLI command | Python function | Main output |

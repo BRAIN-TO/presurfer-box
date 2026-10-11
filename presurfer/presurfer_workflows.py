@@ -188,7 +188,7 @@ def run_segmentation(
     )
     try:
         report_stage(reporter, "Running SPM segmentation", started)
-        run_spm_batch(mount_root, job, container, run_dir / "spm.log")
+        run_spm_batch(mount_root, job, container, run_dir / "spm.log", threads)
     finally:
         job.unlink(missing_ok=True)
     stem = nii_stem(copied)
@@ -205,7 +205,7 @@ def run_segmentation(
         job.write_text(imcalc_job(inputs, output, mask.expression, batch_file, threads))
         try:
             report_stage(reporter, f"Generating {mask.suffix}", started)
-            run_spm_batch(mount_root, job, container, run_dir / "spm.log")
+            run_spm_batch(mount_root, job, container, run_dir / "spm.log", threads)
         finally:
             job.unlink(missing_ok=True)
     report_stage(reporter, "Workflow complete", started)

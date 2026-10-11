@@ -14,6 +14,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `spm.log` now records the container, image, and MATLAB thread count for every
+  SPM step, and keeps the output of all steps instead of only the last one.
 - The command is now `presurfer`. `presurfer-box` still works as an alias.
 - `--engine docker|apptainer` option for choosing the container engine, for
   example on HPC systems.
