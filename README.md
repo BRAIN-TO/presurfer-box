@@ -244,7 +244,7 @@ presurfer MPRAGEise INV2.nii UNI.nii
 [MPRAGEising is better than background removal ('denoising')](https://github.com/srikash/3dMPRAGEise).
 
 If you used dielectric pads, strip them now. This step is optional. See
-[PadsOff](https://github.com/srikash/faceoff/blob/master/PadsOff), which needs
+[FaceOff](https://github.com/srikash/FaceOff/blob/master/FaceOff), which needs
 [ANTs](https://github.com/srikash/TheBeesKnees/wiki/Installing-Advanced-Normalization-Tools-(ANTs)).
 
 <img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/presurfer_step0b.gif" width="400" alt="Stripping dielectric pads">
