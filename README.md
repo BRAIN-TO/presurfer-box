@@ -302,20 +302,14 @@ laminar surfaces:
 
 ### Step by step
 
-Run the steps separately when you need to work on an image in between, or when
-you only want some of the outputs. For example, if you used dielectric pads, strip
-them from the MPRAGEised UNI before the brain mask. This step is optional. See
-[FaceOff](https://github.com/srikash/FaceOff/blob/master/FaceOff), which needs
-[ANTs](https://github.com/srikash/TheBeesKnees/wiki/Installing-Advanced-Normalization-Tools-(ANTs)).
+Run the steps separately when you only want some of the outputs, or need to work
+on an image in between.
 
 ```bash
 presurfer stripmask INV2.nii            # strip mask from INV2
 presurfer MPRAGEise INV2.nii UNI.nii    # MPRAGEised UNI
-# optional: strip dielectric pads from the MPRAGEised UNI with FaceOff
 presurfer brainmask UNI_MPRAGEised.nii  # brain mask from the MPRAGEised UNI
 ```
-
-<img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/presurfer_step0b.gif" width="400" alt="Stripping dielectric pads">
 
 The step-by-step route needs three SPM segmentations instead of two, because
 `MPRAGEise` runs its own bias correction.
