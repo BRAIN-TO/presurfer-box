@@ -78,7 +78,7 @@ class WorkflowSpec:
 
 
 WORKFLOWS: dict[Kind, WorkflowSpec] = {
-    "biascorrect": WorkflowSpec([0] * 6, 3, (), ()),
+    "biascorrect": WorkflowSpec([0] * 6, 2, (), ()),
     "UNI": WorkflowSpec(
         [1, 1, 1, 0, 0, 0],
         2,
@@ -491,9 +491,6 @@ def presurf_recon_prep(
     MPRAGEise, then runs the brain-mask workflow on the MPRAGEised UNI. This
     skips the separate bias-correction run that ``presurf_mprageise`` needs.
 
-    The bias correction comes from the 2 mm strip-mask segmentation rather than
-    the 3 mm sampling that ``presurf_mprageise`` uses, so the MPRAGEised image
-    can differ slightly from the one that function produces.
 
     Args:
         inv2_file: Path to the INV2 ``.nii`` or ``.nii.gz`` image.
