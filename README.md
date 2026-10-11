@@ -254,50 +254,43 @@ the workflow writes an uncompressed working copy into its output directory.
 
 ## Example
 
-A typical MP2RAGE preparation for FreeSurfer has four steps. Steps 0 to 2 can
-be run together with `presurfer recon-prep INV2.nii UNI.nii`, which reuses the
-INV2 bias correction and so needs one fewer SPM run. The steps are shown
-separately below.
+### Prepare an MP2RAGE for FreeSurfer
 
-### Step 0: MPRAGEise UNI
+One command prepares INV2 and UNI for FreeSurfer:
 
 ```bash
-presurfer MPRAGEise INV2.nii UNI.nii
+presurfer recon-prep INV2.nii UNI.nii
 ```
 
-<img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/presurfer_step0.gif" width="400" alt="MPRAGEising the UNI image">
+It runs the INV2 segmentation first, reuses its bias correction to MPRAGEise UNI,
+and then segments the MPRAGEised UNI. Everything goes into one run directory:
 
-[MPRAGEising is better than background removal ('denoising')](https://github.com/srikash/3dMPRAGEise).
-
-If you used dielectric pads, strip them now. This step is optional. See
-[FaceOff](https://github.com/srikash/FaceOff/blob/master/FaceOff), which needs
-[ANTs](https://github.com/srikash/TheBeesKnees/wiki/Installing-Advanced-Normalization-Tools-(ANTs)).
-
-<img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/presurfer_step0b.gif" width="400" alt="Stripping dielectric pads">
-
-### Step 1: get a strip mask from INV2
-
-```bash
-presurfer stripmask INV2.nii
+```text
+YYMMDDThh:mm:ss_presurfer/
+├── presurf_INV2/        # INV2_stripmask.nii
+├── presurf_MPRAGEise/   # UNI_MPRAGEised.nii
+└── presurf_UNI/         # UNI_MPRAGEised_brainmask.nii, UNI_MPRAGEised_WMmask.nii
 ```
+
+The strip mask, from INV2:
 
 <img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/presurf_INV2_output.png" width="400" alt="Strip mask from INV2">
 
-### Step 2: get a brain mask from UNI
+The MPRAGEised UNI. [MPRAGEising is better than background removal ('denoising')](https://github.com/srikash/3dMPRAGEise).
+
+<img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/presurfer_step0.gif" width="400" alt="MPRAGEising the UNI image">
+
+The brain mask, from the MPRAGEised UNI:
+
+<img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/presurf_UNI_output.png" width="400" alt="Brain mask from the MPRAGEised UNI">
+
+Then use the strip mask to remove the non-brain parts of the MPRAGEised UNI, and
+run `recon-all` on the stripped image:
 
 ```bash
-presurfer brainmask UNI.nii
-```
-
-<img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/presurf_UNI_output.png" width="400" alt="Brain mask from UNI">
-
-### Step 3: run FreeSurfer
-
-Use the INV2 strip mask to remove the non-brain parts of the MPRAGEised UNI
-image, then run `recon-all` on the stripped image:
-
-```bash
-fslmaths MPRAGEised.nii -mul stripMask.nii MPRAGEised_stripped.nii
+RUN=YYMMDDThh:mm:ss_presurfer
+fslmaths $RUN/presurf_MPRAGEise/UNI_MPRAGEised.nii \
+  -mul $RUN/presurf_INV2/INV2_stripmask.nii MPRAGEised_stripped.nii
 ```
 
 Here is a fully automated segmentation with presurfer and FreeSurfer, including
@@ -306,6 +299,26 @@ laminar surfaces:
 <img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/freesurfer_seg.png" width="1200" alt="FreeSurfer segmentation and laminar surfaces">
 
 <img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/drake_presurfer.jpg" width="400" alt="Drake approves of presurfer">
+
+### Step by step
+
+Run the steps separately when you need to work on an image in between, or when
+you only want some of the outputs. For example, if you used dielectric pads, strip
+them from the MPRAGEised UNI before the brain mask. This step is optional. See
+[FaceOff](https://github.com/srikash/FaceOff/blob/master/FaceOff), which needs
+[ANTs](https://github.com/srikash/TheBeesKnees/wiki/Installing-Advanced-Normalization-Tools-(ANTs)).
+
+```bash
+presurfer stripmask INV2.nii            # strip mask from INV2
+presurfer MPRAGEise INV2.nii UNI.nii    # MPRAGEised UNI
+# optional: strip dielectric pads from the MPRAGEised UNI with FaceOff
+presurfer brainmask UNI_MPRAGEised.nii  # brain mask from the MPRAGEised UNI
+```
+
+<img src="https://raw.githubusercontent.com/srikash/TheBeesKnees/main/imgs/presurfer_step0b.gif" width="400" alt="Stripping dielectric pads">
+
+The step-by-step route needs three SPM segmentations instead of two, because
+`MPRAGEise` runs its own bias correction.
 
 To run only the SPM bias correction, use `presurfer biascorrect`.
 
