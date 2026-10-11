@@ -6,13 +6,12 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal
 
-import nibabel as nib
-import numpy as np
 from rich.console import Console
 
 from presurfer.container_runtime import IMAGE, SIF_IMAGE, Container, Runtime
+from presurfer.mprageise_maths import check_matching_grids, combine_mprageise
 from presurfer.output_paths import materialise_input, nii_stem, utc_run_directory
 from presurfer.spm_runner import ContainerRunner, SegmentationFiles, SpmRunner
 
@@ -195,32 +194,14 @@ def run_segmentation(
     return _run_workflow(source, kind, runner, reporter=reporter)[0]
 
 
-def _check_matching_grids(inv2: Path, uni: Path) -> None:
-    """Check that INV2 and UNI share a voxel grid, reading headers only.
-
-    Args:
-        inv2: INV2 ``.nii`` or ``.nii.gz`` file.
-        uni: UNI ``.nii`` or ``.nii.gz`` file.
-
-    Raises:
-        RuntimeError: If the image dimensions or spatial affines differ.
-    """
-    inv2_img = cast("nib.Nifti1Image", nib.load(str(inv2)))
-    uni_img = cast("nib.Nifti1Image", nib.load(str(uni)))
-    if inv2_img.shape != uni_img.shape:
-        raise RuntimeError("INV2 and UNI images must have matching dimensions.")
-    if not np.allclose(inv2_img.affine, uni_img.affine):
-        raise RuntimeError("INV2 and UNI images must have matching spatial affines.")
-
-
-def _combine_mprageise(
+def _write_mprageised(
     inv2_biascorrected: Path,
     uni: Path,
     output_dir: Path,
     reporter: StageReporter | None,
     started: float,
 ) -> Path:
-    """Multiply a normalised bias-corrected INV2 voxelwise with UNI.
+    """Copy UNI into the output directory and write its MPRAGEised version.
 
     Args:
         inv2_biascorrected: Bias-corrected INV2 ``.nii`` file.
@@ -233,31 +214,12 @@ def _combine_mprageise(
         Path to the generated ``*_MPRAGEised.nii`` image.
 
     Raises:
-        RuntimeError: If the images differ in dimensions or affine, or INV2
-            has no finite voxels.
+        RuntimeError: If the images do not match.
     """
     uni_local = materialise_input(uni, output_dir)
-    uni_img = cast("nib.Nifti1Image", nib.load(str(uni_local)))
-    inv2_img = cast("nib.Nifti1Image", nib.load(str(inv2_biascorrected)))
-    uni_data = uni_img.get_fdata(dtype=np.float64)
-    inv2_data = inv2_img.get_fdata(dtype=np.float64)
-    if uni_data.shape != inv2_data.shape:
-        raise RuntimeError("INV2 and UNI images must have matching dimensions.")
-    if not np.allclose(uni_img.affine, inv2_img.affine):
-        raise RuntimeError("INV2 and UNI images must have matching spatial affines.")
-    if not np.isfinite(inv2_data).any():
-        raise RuntimeError("Bias-corrected INV2 contains no finite voxel values.")
     report_stage(reporter, "Running MPRAGEise image calculation", started)
-    minimum, maximum = np.nanmin(inv2_data), np.nanmax(inv2_data)
-    normalised = (
-        np.zeros_like(inv2_data)
-        if maximum == minimum
-        else (inv2_data - minimum) / (maximum - minimum)
-    )
-    output = output_dir / f"{nii_stem(uni)}_MPRAGEised.nii"
-    nib.save(
-        nib.Nifti1Image(uni_data * normalised, uni_img.affine, uni_img.header),
-        str(output),
+    output = combine_mprageise(
+        inv2_biascorrected, uni_local, output_dir / f"{nii_stem(uni)}_MPRAGEised.nii"
     )
     report_stage(reporter, "MPRAGEise complete", started)
     return output
@@ -302,7 +264,7 @@ def mprageise(
     output_dir = run_dir / "presurf_MPRAGEise"
     output_dir.mkdir()
     try:
-        return _combine_mprageise(
+        return _write_mprageised(
             bias_files.biascorrected, uni, output_dir, reporter, started
         )
     finally:
@@ -346,7 +308,7 @@ def recon_prep(
         raise RuntimeError("Both INV2 and UNI inputs must be existing files.")
     nii_stem(inv2)
     nii_stem(uni)
-    _check_matching_grids(inv2, uni)
+    check_matching_grids(inv2, uni)
     report_stage(reporter, "Validated recon-prep inputs", started)
     run_dir = utc_run_directory(inv2.parent)
     _, inv2_files = _run_workflow(
@@ -354,7 +316,7 @@ def recon_prep(
     )
     output_dir = run_dir / "presurf_MPRAGEise"
     output_dir.mkdir()
-    mprageised = _combine_mprageise(
+    mprageised = _write_mprageised(
         inv2_files.biascorrected, uni, output_dir, reporter, started
     )
     _run_workflow(mprageised, "UNI", runner, run_dir=run_dir, reporter=reporter)

@@ -23,6 +23,11 @@ from presurfer import (
     spm_runner,
 )
 from presurfer.container_runtime import Container
+from presurfer.mprageise_maths import (
+    check_matching_grids,
+    combine_mprageise,
+    mprageise_array,
+)
 from presurfer.spm_batch_scripts import (
     MAX_THREADS,
     MIN_THREADS,
@@ -460,3 +465,44 @@ def test_recon_prep_command_is_registered() -> None:
     result = CliRunner().invoke(command_line.main, ["recon-prep", "--help"])
     assert result.exit_code == 0
     assert "INV2_FILE" in result.output
+
+
+def test_mprageise_array_matches_a_hand_calculation() -> None:
+    inv2 = np.array([[1.0, 2.0], [3.0, 5.0]])
+    uni = np.array([[10.0, 20.0], [30.0, 40.0]])
+    # mat2gray(inv2) = (inv2 - 1) / 4 = [[0, 0.25], [0.5, 1]]
+    expected = np.array([[0.0, 5.0], [15.0, 40.0]])
+    assert np.allclose(mprageise_array(inv2, uni), expected)
+
+
+def test_mprageise_array_edge_cases_keep_current_behaviour() -> None:
+    uni = np.full((2, 2), 7.0)
+    assert not mprageise_array(np.full((2, 2), 3.0), uni).any()
+    with_nan = mprageise_array(np.array([[1.0, np.nan], [2.0, 3.0]]), uni)
+    assert np.isnan(with_nan[0, 1])
+    assert np.allclose(with_nan[[0, 1], [0, 0]], [0.0, 3.5])
+
+
+def test_combine_mprageise_writes_uni_header_and_values(tmp_path: Path) -> None:
+    inv2 = np.arange(8, dtype=np.float64).reshape(2, 2, 2) + 1
+    uni = np.full((2, 2, 2), 4.0)
+    affine = np.diag([2.0, 2.0, 2.0, 1.0])
+    nib.save(nib.Nifti1Image(inv2, affine), str(tmp_path / "inv2.nii"))
+    nib.save(nib.Nifti1Image(uni, affine), str(tmp_path / "uni.nii"))
+    output = combine_mprageise(
+        tmp_path / "inv2.nii", tmp_path / "uni.nii", tmp_path / "out.nii"
+    )
+    image = cast("nib.Nifti1Image", nib.load(str(output)))
+    assert np.allclose(image.affine, affine)
+    assert np.allclose(np.asarray(image.dataobj), mprageise_array(inv2, uni))
+
+
+def test_check_matching_grids_rejects_different_affines(tmp_path: Path) -> None:
+    data = np.ones((2, 2, 2))
+    nib.save(nib.Nifti1Image(data, np.eye(4)), str(tmp_path / "a.nii"))
+    nib.save(
+        nib.Nifti1Image(data, np.diag([2.0, 1.0, 1.0, 1.0])), str(tmp_path / "b.nii")
+    )
+    check_matching_grids(tmp_path / "a.nii", tmp_path / "a.nii")
+    with pytest.raises(RuntimeError, match="matching spatial affines"):
+        check_matching_grids(tmp_path / "a.nii", tmp_path / "b.nii")
