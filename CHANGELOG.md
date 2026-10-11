@@ -20,7 +20,9 @@ All notable changes to this project are documented here. The format follows
   segmentation then runs on the MPRAGEised UNI. This needs two SPM segmentations
   instead of three, and writes everything into one run directory. The
   bias correction comes from the 2 mm strip-mask segmentation rather than the
-  3 mm one that `MPRAGEise` uses, so the MPRAGEised image can differ slightly.
+  3 mm one that `MPRAGEise` uses, so the MPRAGEised image is not identical to
+  the `MPRAGEise` result. In one test subject, about 40% of voxels differed
+  (mean difference 0.3% of the intensity range, largest 18%).
 - `spm.log` now records the container, image, and MATLAB thread count for every
   SPM step, and keeps the output of all steps instead of only the last one.
 - The command is now `presurfer`. `presurfer-box` still works as an alias.

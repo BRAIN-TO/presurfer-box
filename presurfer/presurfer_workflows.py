@@ -396,7 +396,9 @@ def presurf_recon_prep(
 
     The bias correction comes from the 2 mm strip-mask segmentation rather than
     the 3 mm sampling that ``presurf_mprageise`` uses, so the MPRAGEised image
-    can differ slightly from the one that function produces.
+    is not identical to the one that function produces. In one test subject,
+    about 40% of voxels differed, with a mean difference of 0.3% of the
+    intensity range.
 
     Args:
         inv2_file: Path to the INV2 ``.nii`` or ``.nii.gz`` image.

@@ -193,7 +193,11 @@ UNI share the same voxel grid before it starts SPM.
 
 Because `recon-prep` takes the bias correction from the strip-mask segmentation
 (2 mm sampling) instead of the separate 3 mm bias correction that `MPRAGEise`
-runs, its MPRAGEised image can differ slightly from the one `MPRAGEise` makes.
+runs, its MPRAGEised image is not the same as the one `MPRAGEise` makes. In one
+test subject, about 40% of voxels differed, the mean difference was 0.3% of the
+intensity range, and the largest was 18%. Over the brighter half of the voxels
+the two images correlated at 0.988. Use `MPRAGEise` when you need the result of
+the original MATLAB pipeline.
 
 ## Python API
 
