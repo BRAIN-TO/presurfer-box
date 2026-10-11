@@ -12,20 +12,9 @@ import nibabel as nib
 import numpy as np
 from rich.console import Console
 
-from presurfer.container_runtime import (
-    IMAGE,
-    SIF_IMAGE,
-    Container,
-    Runtime,
-    run_spm_batch,
-)
-from presurfer.output_paths import (
-    container_path,
-    materialise_input,
-    nii_stem,
-    utc_run_directory,
-)
-from presurfer.spm_batch_scripts import default_threads, imcalc_job, segmentation_job
+from presurfer.container_runtime import IMAGE, SIF_IMAGE, Container, Runtime
+from presurfer.output_paths import materialise_input, nii_stem, utc_run_directory
+from presurfer.spm_runner import ContainerRunner, SegmentationFiles, SpmRunner
 
 Kind = Literal["biascorrect", "UNI", "INV2"]
 StageReporter = Callable[[str], None]
@@ -123,42 +112,21 @@ def report_stage(reporter: StageReporter | None, message: str, started: float) -
         CONSOLE.print(f"[cyan]{rendered}[/cyan]")
 
 
-def rename_segmentation(out: Path, stem: str, classes: tuple[int, ...]) -> None:
-    """Rename SPM segmentation outputs to presurfer output names.
-
-    Args:
-        out: Directory containing SPM-produced segmentation files.
-        stem: NIfTI basename without its extension.
-        classes: Native tissue-class numbers retained by the workflow.
-    """
-    for produced, suffix in (
-        (f"m{stem}.nii", "_biascorrected.nii"),
-        (f"BiasField_{stem}.nii", "_biasfield.nii"),
-    ):
-        (out / produced).replace(out / f"{stem}{suffix}")
-    for number in classes:
-        (out / f"c{number}{stem}.nii").replace(out / f"{stem}_class{number}.nii")
-    (out / f"{stem}_seg8.mat").unlink(missing_ok=True)
-
-
-def run_segmentation(
+def _run_workflow(
     source: Path,
     kind: Kind,
-    container: Container,
+    runner: SpmRunner,
     *,
-    threads: int | None = None,
     temporary: bool = False,
     run_dir: Path | None = None,
     reporter: StageReporter | None = None,
-) -> Path:
+) -> tuple[Path, SegmentationFiles]:
     """Run one configured presurfer SPM segmentation workflow.
 
     Args:
         source: Input ``.nii`` or ``.nii.gz`` file.
         kind: Workflow name: ``"biascorrect"``, ``"UNI"``, or ``"INV2"``.
-        container: Runtime and image to run SPM in.
-        threads: Number of MATLAB computational threads, or ``None`` to keep
-            the MATLAB default.
+        runner: Runs the SPM steps.
         temporary: Whether the run directory is an automatically removed stage.
         run_dir: Existing run directory to write into, so that several
             workflows can share one. By default a new timestamped directory is
@@ -166,7 +134,8 @@ def run_segmentation(
         reporter: Optional recipient for progress messages.
 
     Returns:
-        Created ``presurf_<kind>`` output directory.
+        The created ``presurf_<kind>`` output directory and the segmentation
+        files in it.
 
     Raises:
         RuntimeError: If input validation, container execution, or expected SPM
@@ -185,39 +154,45 @@ def run_segmentation(
     out.mkdir()
     report_stage(reporter, f"Prepared output directory {run_dir}", started)
     copied = materialise_input(source, out)
-    mount_root = run_dir.parent
-    input_in_container = container_path(copied, mount_root)
-    out_in_container = container_path(out, mount_root)
-    job = out / ".presurfer_segmentation.m"
-    job.write_text(
-        segmentation_job(
-            input_in_container, out_in_container, spec.native, spec.samp, threads
-        )
-    )
-    try:
-        report_stage(reporter, "Running SPM segmentation", started)
-        run_spm_batch(mount_root, job, container, run_dir / "spm.log", threads)
-    finally:
-        job.unlink(missing_ok=True)
-    stem = nii_stem(copied)
-    rename_segmentation(out, stem, spec.classes)
+    report_stage(reporter, "Running SPM segmentation", started)
+    files = runner.segment(copied, spec.native, spec.samp, spec.classes)
     report_stage(reporter, "Processed segmentation outputs", started)
+    stem = nii_stem(copied)
     for mask in spec.masks:
-        job = out / ".presurfer_imcalc.m"
-        inputs = [
-            container_path(out / f"{stem}_class{number}.nii", mount_root)
-            for number in mask.classes
-        ]
-        output = container_path(out / f"{stem}{mask.suffix}", mount_root)
-        batch_file = container_path(out / f"{stem}{mask.batch_suffix}", mount_root)
-        job.write_text(imcalc_job(inputs, output, mask.expression, batch_file, threads))
-        try:
-            report_stage(reporter, f"Generating {mask.suffix}", started)
-            run_spm_batch(mount_root, job, container, run_dir / "spm.log", threads)
-        finally:
-            job.unlink(missing_ok=True)
+        report_stage(reporter, f"Generating {mask.suffix}", started)
+        runner.image_calc(
+            [files.classes[number] for number in mask.classes],
+            out / f"{stem}{mask.suffix}",
+            mask.expression,
+            out / f"{stem}{mask.batch_suffix}",
+        )
     report_stage(reporter, "Workflow complete", started)
-    return out
+    return out, files
+
+
+def run_segmentation(
+    source: Path,
+    kind: Kind,
+    runner: SpmRunner,
+    *,
+    reporter: StageReporter | None = None,
+) -> Path:
+    """Run one presurfer SPM segmentation workflow in a new run directory.
+
+    Args:
+        source: Input ``.nii`` or ``.nii.gz`` file.
+        kind: Workflow name: ``"biascorrect"``, ``"UNI"``, or ``"INV2"``.
+        runner: Runs the SPM steps.
+        reporter: Optional recipient for progress messages.
+
+    Returns:
+        Created ``presurf_<kind>`` output directory.
+
+    Raises:
+        RuntimeError: If input validation, container execution, or expected SPM
+            output handling fails.
+    """
+    return _run_workflow(source, kind, runner, reporter=reporter)[0]
 
 
 def _check_matching_grids(inv2: Path, uni: Path) -> None:
@@ -291,9 +266,8 @@ def _combine_mprageise(
 def mprageise(
     inv2: Path,
     uni: Path,
-    container: Container,
+    runner: SpmRunner,
     *,
-    threads: int | None = None,
     reporter: StageReporter | None = None,
 ) -> Path:
     """Create an MPRAGEised UNI image from INV2 and UNI acquisitions.
@@ -304,9 +278,7 @@ def mprageise(
     Args:
         inv2: INV2 ``.nii`` or ``.nii.gz`` input file.
         uni: UNI ``.nii`` or ``.nii.gz`` input file.
-        container: Runtime and image to run SPM in.
-        threads: Number of MATLAB computational threads, or ``None`` to keep
-            the MATLAB default.
+        runner: Runs the SPM steps.
         reporter: Optional recipient for progress messages.
 
     Returns:
@@ -323,24 +295,15 @@ def mprageise(
     nii_stem(inv2)
     nii_stem(uni)
     report_stage(reporter, "Validated MPRAGEise inputs", started)
-    bias_dir = run_segmentation(
-        inv2,
-        "biascorrect",
-        container,
-        threads=threads,
-        temporary=True,
-        reporter=reporter,
+    bias_dir, bias_files = _run_workflow(
+        inv2, "biascorrect", runner, temporary=True, reporter=reporter
     )
     run_dir = utc_run_directory(uni.parent)
     output_dir = run_dir / "presurf_MPRAGEise"
     output_dir.mkdir()
     try:
         return _combine_mprageise(
-            bias_dir / f"{nii_stem(inv2)}_biascorrected.nii",
-            uni,
-            output_dir,
-            reporter,
-            started,
+            bias_files.biascorrected, uni, output_dir, reporter, started
         )
     finally:
         shutil.rmtree(bias_dir.parent, ignore_errors=True)
@@ -350,9 +313,8 @@ def mprageise(
 def recon_prep(
     inv2: Path,
     uni: Path,
-    container: Container,
+    runner: SpmRunner,
     *,
-    threads: int | None = None,
     reporter: StageReporter | None = None,
 ) -> Path:
     """Prepare INV2 and UNI for FreeSurfer in one run with two segmentations.
@@ -366,9 +328,7 @@ def recon_prep(
     Args:
         inv2: INV2 ``.nii`` or ``.nii.gz`` input file.
         uni: UNI ``.nii`` or ``.nii.gz`` input file.
-        container: Runtime and image to run SPM in.
-        threads: Number of MATLAB computational threads, or ``None`` to keep
-            the MATLAB default.
+        runner: Runs the SPM steps.
         reporter: Optional recipient for progress messages.
 
     Returns:
@@ -389,26 +349,15 @@ def recon_prep(
     _check_matching_grids(inv2, uni)
     report_stage(reporter, "Validated recon-prep inputs", started)
     run_dir = utc_run_directory(inv2.parent)
-    inv2_out = run_segmentation(
-        inv2, "INV2", container, threads=threads, run_dir=run_dir, reporter=reporter
+    _, inv2_files = _run_workflow(
+        inv2, "INV2", runner, run_dir=run_dir, reporter=reporter
     )
     output_dir = run_dir / "presurf_MPRAGEise"
     output_dir.mkdir()
     mprageised = _combine_mprageise(
-        inv2_out / f"{nii_stem(inv2)}_biascorrected.nii",
-        uni,
-        output_dir,
-        reporter,
-        started,
+        inv2_files.biascorrected, uni, output_dir, reporter, started
     )
-    run_segmentation(
-        mprageised,
-        "UNI",
-        container,
-        threads=threads,
-        run_dir=run_dir,
-        reporter=reporter,
-    )
+    _run_workflow(mprageised, "UNI", runner, run_dir=run_dir, reporter=reporter)
     report_stage(reporter, "recon-prep complete", started)
     return run_dir
 
@@ -436,12 +385,8 @@ def presurf_biascorrect(
     Raises:
         RuntimeError: If input validation or SPM execution fails.
     """
-    return run_segmentation(
-        Path(input_file),
-        "biascorrect",
-        Container(runtime, image),
-        threads=default_threads() if threads is None else threads,
-    )
+    runner = ContainerRunner(Container(runtime, image), threads)
+    return run_segmentation(Path(input_file), "biascorrect", runner)
 
 
 def presurf_mprageise(
@@ -469,12 +414,8 @@ def presurf_mprageise(
     Raises:
         RuntimeError: If SPM bias correction or image processing fails.
     """
-    return mprageise(
-        Path(inv2_file),
-        Path(uni_file),
-        Container(runtime, image),
-        threads=default_threads() if threads is None else threads,
-    )
+    runner = ContainerRunner(Container(runtime, image), threads)
+    return mprageise(Path(inv2_file), Path(uni_file), runner)
 
 
 def presurf_recon_prep(
@@ -511,12 +452,8 @@ def presurf_recon_prep(
     Raises:
         RuntimeError: If input validation or SPM execution fails.
     """
-    return recon_prep(
-        Path(inv2_file),
-        Path(uni_file),
-        Container(runtime, image),
-        threads=default_threads() if threads is None else threads,
-    )
+    runner = ContainerRunner(Container(runtime, image), threads)
+    return recon_prep(Path(inv2_file), Path(uni_file), runner)
 
 
 def presurf_stripmask(
@@ -542,12 +479,8 @@ def presurf_stripmask(
     Raises:
         RuntimeError: If input validation or SPM execution fails.
     """
-    return run_segmentation(
-        Path(input_file),
-        "INV2",
-        Container(runtime, image),
-        threads=default_threads() if threads is None else threads,
-    )
+    runner = ContainerRunner(Container(runtime, image), threads)
+    return run_segmentation(Path(input_file), "INV2", runner)
 
 
 def presurf_seg(
@@ -573,9 +506,5 @@ def presurf_seg(
     Raises:
         RuntimeError: If input validation or SPM execution fails.
     """
-    return run_segmentation(
-        Path(input_file),
-        "UNI",
-        Container(runtime, image),
-        threads=default_threads() if threads is None else threads,
-    )
+    runner = ContainerRunner(Container(runtime, image), threads)
+    return run_segmentation(Path(input_file), "UNI", runner)

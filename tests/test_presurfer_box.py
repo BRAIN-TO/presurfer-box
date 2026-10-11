@@ -20,6 +20,7 @@ from presurfer import (
     container_runtime,
     output_paths,
     presurfer_workflows,
+    spm_runner,
 )
 from presurfer.container_runtime import Container
 from presurfer.spm_batch_scripts import (
@@ -29,6 +30,7 @@ from presurfer.spm_batch_scripts import (
     imcalc_job,
     segmentation_job,
 )
+from presurfer.spm_runner import ContainerRunner, SegmentationFiles
 
 FIXTURES = json.loads(
     (Path(__file__).parent / "fixtures" / "batch_and_commands.json").read_text()
@@ -263,57 +265,58 @@ def _save(path: Path, data: np.ndarray) -> None:
     nib.save(nib.Nifti1Image(data.astype(np.float32), np.eye(4)), str(path))
 
 
-def _fake_spm(calls: list[str]) -> object:
-    """Return a stand-in for run_spm_batch that writes SPM-style outputs."""
+class FakeRunner:
+    """An in-memory stand-in for SPM that writes small images."""
 
-    def run(
-        mount_root: Path,
-        job: Path,
-        container: Container,
-        log: Path,
-        threads: int | None = None,
-    ) -> None:
-        text = job.read_text()
-        if "preproc" in text:
-            calls.append("segmentation")
-            match = re.search(r"vols = \{'(.*),1'\}", text)
-            assert match
-            source = mount_root / Path(match.group(1)).relative_to("/data")
-            stem = source.stem
-            data = _load(source)
-            out = job.parent
-            _save(out / f"m{stem}.nii", data * 2.0)
-            _save(out / f"BiasField_{stem}.nii", np.ones_like(data))
-            for number in range(1, 7):
-                _save(out / f"c{number}{stem}.nii", np.full_like(data, 0.5))
-        else:
-            calls.append("imcalc")
-            match = re.search(
-                r"output = '(.*)';\nmatlabbatch.*outdir = \{'(.*)'\}", text
-            )
-            assert match
-            outdir = mount_root / Path(match.group(2)).relative_to("/data")
-            _save(outdir / match.group(1), np.ones((4, 4, 4)))
+    def __init__(self) -> None:
+        self.calls: list[str] = []
 
-    return run
+    def segment(
+        self,
+        image: Path,
+        native: list[int],
+        samp: int,
+        keep_classes: tuple[int, ...],
+    ) -> SegmentationFiles:
+        self.calls.append("segment")
+        out = image.parent
+        data = _load(image)
+        stem = output_paths.nii_stem(image)
+        biascorrected = out / f"{stem}_biascorrected.nii"
+        biasfield = out / f"{stem}_biasfield.nii"
+        _save(biascorrected, data * 2.0)
+        _save(biasfield, np.ones_like(data))
+        classes = {}
+        for number in keep_classes:
+            classes[number] = out / f"{stem}_class{number}.nii"
+            _save(classes[number], np.full_like(data, 0.5))
+        return SegmentationFiles(biascorrected, biasfield, classes)
+
+    def image_calc(
+        self,
+        inputs: list[Path],
+        output: Path,
+        expression: str,
+        batch_file: Path,
+    ) -> Path:
+        self.calls.append("image_calc")
+        _save(output, np.ones((4, 4, 4)))
+        return output
 
 
-def test_recon_prep_runs_two_segmentations(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_recon_prep_runs_two_segmentations(tmp_path: Path) -> None:
     inv2 = np.arange(64, dtype=np.float64).reshape(4, 4, 4) + 1
     uni = np.full((4, 4, 4), 3.0)
     _save(tmp_path / "inv2.nii.gz", inv2)
     _save(tmp_path / "uni.nii.gz", uni)
-    calls: list[str] = []
-    monkeypatch.setattr(presurfer_workflows, "run_spm_batch", _fake_spm(calls))
+    runner = FakeRunner()
     run_dir = presurfer_workflows.recon_prep(
         tmp_path / "inv2.nii.gz",
         tmp_path / "uni.nii.gz",
-        Container("docker", "image"),
+        runner,
         reporter=lambda _: None,
     )
-    assert calls.count("segmentation") == SEGMENTATIONS
+    assert runner.calls.count("segment") == SEGMENTATIONS
     assert sorted(p.name for p in run_dir.iterdir()) == [
         "presurf_INV2",
         "presurf_MPRAGEise",
@@ -330,41 +333,130 @@ def test_recon_prep_runs_two_segmentations(
 
 
 def test_recon_prep_rejects_mismatched_grids_before_running_spm(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
     _save(tmp_path / "inv2.nii", np.ones((4, 4, 4)))
     _save(tmp_path / "uni.nii", np.ones((5, 4, 4)))
-    calls: list[str] = []
-    monkeypatch.setattr(presurfer_workflows, "run_spm_batch", _fake_spm(calls))
+    runner = FakeRunner()
     with pytest.raises(RuntimeError, match="matching dimensions"):
         presurfer_workflows.recon_prep(
-            tmp_path / "inv2.nii", tmp_path / "uni.nii", Container("docker", "image")
+            tmp_path / "inv2.nii", tmp_path / "uni.nii", runner
         )
-    assert calls == []
+    assert runner.calls == []
     assert not list(tmp_path.glob("*_presurfer"))
+
+
+def test_standalone_mprageise_still_cleans_up_its_temporary_stage(
+    tmp_path: Path,
+) -> None:
+    inv2 = np.arange(64, dtype=np.float64).reshape(4, 4, 4) + 1
+    _save(tmp_path / "inv2.nii", inv2)
+    _save(tmp_path / "uni.nii", np.full((4, 4, 4), 3.0))
+    runner = FakeRunner()
+    output = presurfer_workflows.mprageise(
+        tmp_path / "inv2.nii",
+        tmp_path / "uni.nii",
+        runner,
+        reporter=lambda _: None,
+    )
+    assert runner.calls == ["segment"]
+    assert output.name == "uni_MPRAGEised.nii"
+    assert output.parent.name == "presurf_MPRAGEise"
+    assert not list(tmp_path.glob("tmp_*"))
+
+
+def test_stripmask_workflow_names_its_outputs(tmp_path: Path) -> None:
+    _save(tmp_path / "inv2.nii", np.ones((4, 4, 4)))
+    out = presurfer_workflows.run_segmentation(
+        tmp_path / "inv2.nii", "INV2", FakeRunner(), reporter=lambda _: None
+    )
+    assert out.name == "presurf_INV2"
+    assert sorted(p.name for p in out.iterdir() if p.suffix == ".nii") == [
+        "inv2.nii",
+        "inv2_biascorrected.nii",
+        "inv2_biasfield.nii",
+        "inv2_class3.nii",
+        "inv2_class4.nii",
+        "inv2_class5.nii",
+        "inv2_class6.nii",
+        "inv2_stripmask.nii",
+    ]
+
+
+def _spm_like_subprocess(calls: list[Path]) -> object:
+    """Stand in for the container: write what SPM would write, host side."""
+
+    def run(
+        mount_root: Path,
+        job: Path,
+        container: Container,
+        log: Path,
+        threads: int | None = None,
+    ) -> None:
+        calls.append(job)
+        assert job.is_file()
+        text = job.read_text()
+        assert text.startswith(f"maxNumCompThreads({threads});")
+        log.write_text(f"ran {job.name}\n")
+        if "preproc" in text:
+            match = re.search(r"vols = \{'/data/(.*),1'\}", text)
+            assert match
+            source = mount_root / match.group(1)
+            data = _load(source)
+            out, stem = source.parent, source.stem
+            _save(out / f"m{stem}.nii", data)
+            _save(out / f"BiasField_{stem}.nii", data)
+            for number in (3, 4):
+                _save(out / f"c{number}{stem}.nii", data)
+            (out / f"{stem}_seg8.mat").write_text("seg8")
+        else:
+            match = re.search(r"output = '(.*)';", text)
+            assert match
+            _save(job.parent / match.group(1), np.ones((4, 4, 4)))
+
+    return run
+
+
+def test_container_runner_names_outputs_and_cleans_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_dir = tmp_path / "260908T12:34:56_presurfer"
+    out = run_dir / "presurf_INV2"
+    out.mkdir(parents=True)
+    _save(out / "scan.nii", np.ones((4, 4, 4)))
+    jobs: list[Path] = []
+    monkeypatch.setattr(spm_runner, "run_spm_batch", _spm_like_subprocess(jobs))
+    runner = ContainerRunner(Container("docker", "image"), threads=5)
+    files = runner.segment(out / "scan.nii", [0, 0, 1, 1, 1, 1], 2, (3, 4))
+    assert files.biascorrected == out / "scan_biascorrected.nii"
+    assert files.biasfield == out / "scan_biasfield.nii"
+    assert sorted(files.classes) == [3, 4]
+    assert files.classes[3] == out / "scan_class3.nii"
+    result = runner.image_calc(
+        [files.classes[3], files.classes[4]],
+        out / "scan_mask.nii",
+        "i1+i2",
+        out / "scan_batch.mat",
+    )
+    assert result.is_file()
+    assert [job.name for job in jobs] == [
+        ".presurfer_segmentation.m",
+        ".presurfer_imcalc.m",
+    ]
+    assert not any(job.exists() for job in jobs)
+    assert not list(out.glob("c[0-9]*")) and not (out / "scan_seg8.mat").exists()
+    assert not (out / "mscan.nii").exists()
+
+
+def test_container_runner_defaults_to_clamped_thread_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(os, "sched_getaffinity", lambda _: set(range(64)))
+    assert ContainerRunner(Container("docker", "image")).threads == MAX_THREADS
+    assert ContainerRunner(Container("docker", "image"), 1).threads == 1
 
 
 def test_recon_prep_command_is_registered() -> None:
     result = CliRunner().invoke(command_line.main, ["recon-prep", "--help"])
     assert result.exit_code == 0
     assert "INV2_FILE" in result.output
-
-
-def test_standalone_mprageise_still_cleans_up_its_temporary_stage(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    inv2 = np.arange(64, dtype=np.float64).reshape(4, 4, 4) + 1
-    _save(tmp_path / "inv2.nii", inv2)
-    _save(tmp_path / "uni.nii", np.full((4, 4, 4), 3.0))
-    calls: list[str] = []
-    monkeypatch.setattr(presurfer_workflows, "run_spm_batch", _fake_spm(calls))
-    output = presurfer_workflows.mprageise(
-        tmp_path / "inv2.nii",
-        tmp_path / "uni.nii",
-        Container("docker", "image"),
-        reporter=lambda _: None,
-    )
-    assert calls == ["segmentation"]
-    assert output.name == "uni_MPRAGEised.nii"
-    assert output.parent.name == "presurf_MPRAGEise"
-    assert not list(tmp_path.glob("tmp_*"))
