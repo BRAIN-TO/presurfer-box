@@ -398,7 +398,8 @@ def presurf_recon_prep(
     the 3 mm sampling that ``presurf_mprageise`` uses, so the MPRAGEised image
     is not identical to the one that function produces. In one test subject,
     about 40% of voxels differed, with a mean difference of 0.3% of the
-    intensity range.
+    intensity range. Use ``presurf_mprageise`` followed by ``presurf_seg`` when
+    you need the original pipeline's result.
 
     Args:
         inv2_file: Path to the INV2 ``.nii`` or ``.nii.gz`` image.
@@ -454,7 +455,7 @@ def presurf_seg(
     runtime: Runtime = "docker",
     threads: int | None = None,
 ) -> Path:
-    """Generate UNI tissue-class, brain-mask, and WM-mask outputs.
+    """Generate UNI tissue-class, brain-mask, and white-matter mask outputs.
 
     Args:
         input_file: Path to a UNI ``.nii`` or ``.nii.gz`` image.

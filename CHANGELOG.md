@@ -32,6 +32,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Bias correction keeps the original 3 mm sampling, so `biascorrect` and the
+  first step of `MPRAGEise` give the same numbers as the earlier code.
+- Internally, every SPM step now runs through one runner module
+  (`presurfer.spm_runner`), and the MPRAGEise calculation lives in its own module
+  (`presurfer.mprageise_maths`). Output files and numbers are unchanged: a
+  single-thread bias correction and the MPRAGEised image were byte-identical
+  before and after.
 - **Breaking:** the Python functions were renamed to match the presurfer
   branding: `spm_biascorrect`, `spm_mprageise`, `spm_stripmask`, and `spm_seg`
   are now `presurf_biascorrect`, `presurf_mprageise`, `presurf_stripmask`, and

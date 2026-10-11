@@ -196,8 +196,13 @@ Because `recon-prep` takes the bias correction from the strip-mask segmentation
 runs, its MPRAGEised image is not the same as the one `MPRAGEise` makes. In one
 test subject, about 40% of voxels differed, the mean difference was 0.3% of the
 intensity range, and the largest was 18%. Over the brighter half of the voxels
-the two images correlated at 0.988. Use `MPRAGEise` when you need the result of
-the original MATLAB pipeline.
+the two images correlated at 0.988.
+
+This is a deliberate trade. `recon-prep` saves one segmentation, about 13 to 15
+minutes per subject on a 12-thread machine, in exchange for a slightly different
+MPRAGEised image. Whether that difference matters for your FreeSurfer surfaces is
+worth checking on your own data. Use `MPRAGEise` followed by `brainmask` when you
+need the result of the original MATLAB pipeline.
 
 ## Python API
 
@@ -227,14 +232,15 @@ presurf_stripmask("INV2.nii", image="spm.sif", runtime="apptainer")
 `presurf_biascorrect`, `presurf_stripmask`, and `presurf_seg` return the path
 of the `presurf_*` output directory. `presurf_mprageise` returns the path of the
 `*_MPRAGEised.nii` image. `presurf_recon_prep` returns the run directory that
-holds `presurf_INV2`, `presurf_MPRAGEise`, and `presurf_UNI`. All of them raise `RuntimeError` if the container is
-unavailable or SPM fails.
+holds `presurf_INV2`, `presurf_MPRAGEise`, and `presurf_UNI`. All of them raise
+`RuntimeError` if the container is unavailable or SPM fails.
 
 ## Outputs
 
 Each run creates a new UTC timestamped directory beside its input, containing one
 `presurf_*` directory for the workflow. The `biascorrect`, `stripmask`, and
-`brainmask` workflows also save the SPM output as `spm.log`:
+`brainmask` workflows also save the SPM output as `spm.log`, with a short header
+for each step that gives the container, the image, and the MATLAB thread count:
 
 ```text
 YYMMDDThh:mm:ss_presurfer/
@@ -353,6 +359,16 @@ presurfer commit (unlikely to happen).
 - The MPRAGEise multiplication is reimplemented with NumPy and NiBabel. It
   follows the original `mat2gray(INV2) .* UNI` calculation but also needs
   validation on representative data.
+- Bias correction (`biascorrect` and the first step of `MPRAGEise`) samples at
+  3 mm, as the original MATLAB code does. The strip-mask and brain-mask
+  segmentations sample at 2 mm.
+- Tidying the code did not change any numbers. On one test subject, a
+  single-thread bias correction from this version was byte-identical to the one
+  from the earlier code, and the MPRAGEise calculation was byte-identical before
+  and after it moved into its own module.
+- A fixed `--threads` value gives identical results every time. Different values
+  can change results slightly, and `recon-prep` differs from `MPRAGEise` as
+  described above.
 
 ## Licence
 
