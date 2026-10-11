@@ -127,6 +127,9 @@ presurfer stripmask INV2.nii
 
 # Create UNI tissue classes, brain mask, and white-matter mask
 presurfer brainmask UNI.nii
+
+# Do all of the above for a FreeSurfer run in one go
+presurfer recon-prep INV2.nii UNI.nii
 ```
 
 Inputs can be `.nii` or `.nii.gz`. Docker is the default runtime. To use a local
@@ -176,10 +179,21 @@ thread count of every step, so you can reproduce a run by passing the same
 | Create MPRAGEised UNI | `MPRAGEise INV2 UNI` | `presurf_mprageise()` | `*_MPRAGEised.nii` |
 | Create a strip mask | `stripmask INV2` | `presurf_stripmask()` | `*_stripmask.nii` |
 | Create UNI-derived masks | `brainmask UNI` | `presurf_seg()` | Tissue classes, brain mask, and white-matter mask |
+| Prepare INV2 and UNI for FreeSurfer | `recon-prep INV2 UNI` | `presurf_recon_prep()` | MPRAGEised UNI, strip mask, brain mask, and white-matter mask |
 
 `MPRAGEise` bias-corrects INV2 in a temporary directory, rescales the corrected
 INV2 to the range 0 to 1, and multiplies it voxel by voxel with UNI. It does not
 run the strip-mask workflow, so run `stripmask` separately if you need the mask.
+
+`recon-prep` runs the whole preparation with two SPM segmentations instead of
+three. It segments INV2 (which gives the strip mask and a bias-corrected INV2),
+reuses that bias-corrected INV2 to MPRAGEise UNI, and then segments the
+MPRAGEised UNI to get the brain and white-matter masks. It checks that INV2 and
+UNI share the same voxel grid before it starts SPM.
+
+Because `recon-prep` takes the bias correction from the strip-mask segmentation
+(2 mm sampling) instead of the separate 3 mm bias correction that `MPRAGEise`
+runs, its MPRAGEised image can differ slightly from the one `MPRAGEise` makes.
 
 ## Python API
 
@@ -187,6 +201,7 @@ run the strip-mask workflow, so run `stripmask` separately if you need the mask.
 from presurfer import (
     presurf_biascorrect,
     presurf_mprageise,
+    presurf_recon_prep,
     presurf_seg,
     presurf_stripmask,
 )
@@ -195,6 +210,7 @@ presurf_biascorrect("INV2.nii")
 presurf_mprageise("INV2.nii", "UNI.nii")
 presurf_stripmask("INV2.nii")
 presurf_seg("UNI.nii")
+presurf_recon_prep("INV2.nii", "UNI.nii")
 ```
 
 Every function accepts the optional keywords `image=`, `runtime=`, and
@@ -206,7 +222,8 @@ presurf_stripmask("INV2.nii", image="spm.sif", runtime="apptainer")
 
 `presurf_biascorrect`, `presurf_stripmask`, and `presurf_seg` return the path
 of the `presurf_*` output directory. `presurf_mprageise` returns the path of the
-`*_MPRAGEised.nii` image. All of them raise `RuntimeError` if the container is
+`*_MPRAGEised.nii` image. `presurf_recon_prep` returns the run directory that
+holds `presurf_INV2`, `presurf_MPRAGEise`, and `presurf_UNI`. All of them raise `RuntimeError` if the container is
 unavailable or SPM fails.
 
 ## Outputs
@@ -226,12 +243,25 @@ same second, the second directory gets a numeric suffix (`-2`). `MPRAGEise` uses
 temporary `tmp_` directory for its bias-correction step and removes it
 afterwards.
 
+`recon-prep` writes all three workflows into one run directory:
+
+```text
+YYMMDDThh:mm:ss_presurfer/
+├── spm.log
+├── presurf_INV2/        # strip mask and bias-corrected INV2
+├── presurf_MPRAGEise/   # MPRAGEised UNI
+└── presurf_UNI/         # brain mask and white-matter mask, from the MPRAGEised UNI
+```
+
 Compressed `.nii.gz` inputs are supported. The source file is never changed, and
 the workflow writes an uncompressed working copy into its output directory.
 
 ## Example
 
-A typical MP2RAGE preparation for FreeSurfer has four steps.
+A typical MP2RAGE preparation for FreeSurfer has four steps. Steps 0 to 2 can
+be run together with `presurfer recon-prep INV2.nii UNI.nii`, which reuses the
+INV2 bias correction and so needs one fewer SPM run. The steps are shown
+separately below.
 
 ### Step 0: MPRAGEise UNI
 

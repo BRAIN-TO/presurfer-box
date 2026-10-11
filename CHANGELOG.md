@@ -14,6 +14,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `recon-prep` command and `presurf_recon_prep()` function. They prepare INV2
+  and UNI for FreeSurfer in one run: the strip-mask segmentation of INV2 also
+  supplies the bias-corrected INV2 for MPRAGEise, and the brain-mask
+  segmentation then runs on the MPRAGEised UNI. This needs two SPM segmentations
+  instead of three, and writes everything into one run directory. The
+  bias correction comes from the 2 mm strip-mask segmentation rather than the
+  3 mm one that `MPRAGEise` uses, so the MPRAGEised image can differ slightly.
 - `spm.log` now records the container, image, and MATLAB thread count for every
   SPM step, and keeps the output of all steps instead of only the last one.
 - The command is now `presurfer`. `presurfer-box` still works as an alias.

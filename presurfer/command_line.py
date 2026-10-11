@@ -12,6 +12,7 @@ from presurfer.container_runtime import IMAGE, Container, check_container
 from presurfer.presurfer_workflows import (
     presurf_biascorrect,
     presurf_mprageise,
+    presurf_recon_prep,
     presurf_seg,
     presurf_stripmask,
 )
@@ -23,7 +24,7 @@ __all__ = ["main"]
 
 def _invoke_workflow(
     ctx: click.Context, operation: Callable[..., Path], *args: Path
-) -> None:
+) -> Path:
     """Run a public workflow and translate its errors for the Click CLI.
 
     Args:
@@ -33,6 +34,9 @@ def _invoke_workflow(
 
     Raises:
         click.ClickException: If the workflow fails before producing output.
+
+    Returns:
+        The path returned by the workflow.
     """
     try:
         started = time.monotonic()
@@ -41,6 +45,7 @@ def _invoke_workflow(
         raise click.ClickException(str(error)) from error
     CONSOLE.print(f"[green]Complete[/green] in {time.monotonic() - started:.1f}s")
     CONSOLE.print(str(output))
+    return output
 
 
 @click.group(
@@ -135,6 +140,27 @@ def cmd_biascorrect(ctx: click.Context, input_file: Path) -> None:
 def cmd_mprageise(ctx: click.Context, inv2_file: Path, uni_file: Path) -> None:
     """Create an MPRAGEised UNI image from INV2_FILE and UNI_FILE."""
     _invoke_workflow(ctx, presurf_mprageise, inv2_file, uni_file)
+
+
+@main.command(name="recon-prep")
+@click.argument(
+    "inv2_file", type=click.Path(exists=True, dir_okay=False, path_type=Path)
+)
+@click.argument(
+    "uni_file", type=click.Path(exists=True, dir_okay=False, path_type=Path)
+)
+@click.pass_context
+def cmd_recon_prep(ctx: click.Context, inv2_file: Path, uni_file: Path) -> None:
+    """Prepare INV2_FILE and UNI_FILE for FreeSurfer in one run.
+
+    Creates the strip mask from INV2, an MPRAGEised UNI that reuses the INV2
+    bias correction, and the brain and white-matter masks from the MPRAGEised
+    UNI. This needs two SPM segmentations instead of three.
+    """
+    run_dir = _invoke_workflow(ctx, presurf_recon_prep, inv2_file, uni_file)
+    for suffix in ("_MPRAGEised", "_stripmask", "_brainmask", "_WMmask"):
+        for path in sorted(run_dir.glob(f"presurf_*/*{suffix}.nii")):
+            CONSOLE.print(f"  {path.relative_to(run_dir)}")
 
 
 @main.command(name="stripmask")

@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
 
+import nibabel as nib
+import numpy as np
 from rich.console import Console
 
 from presurfer.container_runtime import (
@@ -35,6 +37,7 @@ __all__ = [
     "SIF_IMAGE",
     "presurf_biascorrect",
     "presurf_mprageise",
+    "presurf_recon_prep",
     "presurf_seg",
     "presurf_stripmask",
 ]
@@ -145,6 +148,7 @@ def run_segmentation(
     *,
     threads: int | None = None,
     temporary: bool = False,
+    run_dir: Path | None = None,
     reporter: StageReporter | None = None,
 ) -> Path:
     """Run one configured presurfer SPM segmentation workflow.
@@ -156,6 +160,9 @@ def run_segmentation(
         threads: Number of MATLAB computational threads, or ``None`` to keep
             the MATLAB default.
         temporary: Whether the run directory is an automatically removed stage.
+        run_dir: Existing run directory to write into, so that several
+            workflows can share one. By default a new timestamped directory is
+            created beside ``source``.
         reporter: Optional recipient for progress messages.
 
     Returns:
@@ -172,12 +179,13 @@ def run_segmentation(
         raise RuntimeError(f"Input file does not exist: {source}")
     nii_stem(source)
     report_stage(reporter, "Validated input", started)
-    run_dir = utc_run_directory(source.parent, temporary)
+    if run_dir is None:
+        run_dir = utc_run_directory(source.parent, temporary)
     out = run_dir / f"presurf_{kind}"
     out.mkdir()
     report_stage(reporter, f"Prepared output directory {run_dir}", started)
     copied = materialise_input(source, out)
-    mount_root = source.parent
+    mount_root = run_dir.parent
     input_in_container = container_path(copied, mount_root)
     out_in_container = container_path(out, mount_root)
     job = out / ".presurfer_segmentation.m"
@@ -212,6 +220,74 @@ def run_segmentation(
     return out
 
 
+def _check_matching_grids(inv2: Path, uni: Path) -> None:
+    """Check that INV2 and UNI share a voxel grid, reading headers only.
+
+    Args:
+        inv2: INV2 ``.nii`` or ``.nii.gz`` file.
+        uni: UNI ``.nii`` or ``.nii.gz`` file.
+
+    Raises:
+        RuntimeError: If the image dimensions or spatial affines differ.
+    """
+    inv2_img = cast("nib.Nifti1Image", nib.load(str(inv2)))
+    uni_img = cast("nib.Nifti1Image", nib.load(str(uni)))
+    if inv2_img.shape != uni_img.shape:
+        raise RuntimeError("INV2 and UNI images must have matching dimensions.")
+    if not np.allclose(inv2_img.affine, uni_img.affine):
+        raise RuntimeError("INV2 and UNI images must have matching spatial affines.")
+
+
+def _combine_mprageise(
+    inv2_biascorrected: Path,
+    uni: Path,
+    output_dir: Path,
+    reporter: StageReporter | None,
+    started: float,
+) -> Path:
+    """Multiply a normalised bias-corrected INV2 voxelwise with UNI.
+
+    Args:
+        inv2_biascorrected: Bias-corrected INV2 ``.nii`` file.
+        uni: UNI ``.nii`` or ``.nii.gz`` input file.
+        output_dir: Existing directory that receives the MPRAGEised image.
+        reporter: Optional recipient for progress messages.
+        started: Workflow start time from ``time.monotonic()``.
+
+    Returns:
+        Path to the generated ``*_MPRAGEised.nii`` image.
+
+    Raises:
+        RuntimeError: If the images differ in dimensions or affine, or INV2
+            has no finite voxels.
+    """
+    uni_local = materialise_input(uni, output_dir)
+    uni_img = cast("nib.Nifti1Image", nib.load(str(uni_local)))
+    inv2_img = cast("nib.Nifti1Image", nib.load(str(inv2_biascorrected)))
+    uni_data = uni_img.get_fdata(dtype=np.float64)
+    inv2_data = inv2_img.get_fdata(dtype=np.float64)
+    if uni_data.shape != inv2_data.shape:
+        raise RuntimeError("INV2 and UNI images must have matching dimensions.")
+    if not np.allclose(uni_img.affine, inv2_img.affine):
+        raise RuntimeError("INV2 and UNI images must have matching spatial affines.")
+    if not np.isfinite(inv2_data).any():
+        raise RuntimeError("Bias-corrected INV2 contains no finite voxel values.")
+    report_stage(reporter, "Running MPRAGEise image calculation", started)
+    minimum, maximum = np.nanmin(inv2_data), np.nanmax(inv2_data)
+    normalised = (
+        np.zeros_like(inv2_data)
+        if maximum == minimum
+        else (inv2_data - minimum) / (maximum - minimum)
+    )
+    output = output_dir / f"{nii_stem(uni)}_MPRAGEised.nii"
+    nib.save(
+        nib.Nifti1Image(uni_data * normalised, uni_img.affine, uni_img.header),
+        str(output),
+    )
+    report_stage(reporter, "MPRAGEise complete", started)
+    return output
+
+
 def mprageise(
     inv2: Path,
     uni: Path,
@@ -237,7 +313,7 @@ def mprageise(
         Path to the generated ``*_MPRAGEised.nii`` image.
 
     Raises:
-        RuntimeError: If SPM bias correction fails or NumPy/NiBabel is absent.
+        RuntimeError: If SPM bias correction fails or the images do not match.
     """
     started = time.monotonic()
     inv2 = inv2.resolve()
@@ -255,48 +331,86 @@ def mprageise(
         temporary=True,
         reporter=reporter,
     )
-    try:
-        import nibabel as nib
-        import numpy as np
-    except ImportError:
-        raise RuntimeError(
-            "MPRAGEise needs numpy and nibabel. Install project dependencies with uv sync."
-        ) from None
     run_dir = utc_run_directory(uni.parent)
     output_dir = run_dir / "presurf_MPRAGEise"
     output_dir.mkdir()
     try:
-        uni_local = materialise_input(uni, output_dir)
-        inv2_bias = bias_dir / f"{nii_stem(inv2)}_biascorrected.nii"
-        uni_img = cast("nib.Nifti1Image", nib.load(str(uni_local)))
-        inv2_img = cast("nib.Nifti1Image", nib.load(str(inv2_bias)))
-        uni_data = uni_img.get_fdata(dtype=np.float64)
-        inv2_data = inv2_img.get_fdata(dtype=np.float64)
-        if uni_data.shape != inv2_data.shape:
-            raise RuntimeError("INV2 and UNI images must have matching dimensions.")
-        if not np.allclose(uni_img.affine, inv2_img.affine):
-            raise RuntimeError(
-                "INV2 and UNI images must have matching spatial affines."
-            )
-        if not np.isfinite(inv2_data).any():
-            raise RuntimeError("Bias-corrected INV2 contains no finite voxel values.")
-        report_stage(reporter, "Running MPRAGEise image calculation", started)
-        minimum, maximum = np.nanmin(inv2_data), np.nanmax(inv2_data)
-        normalised = (
-            np.zeros_like(inv2_data)
-            if maximum == minimum
-            else (inv2_data - minimum) / (maximum - minimum)
+        return _combine_mprageise(
+            bias_dir / f"{nii_stem(inv2)}_biascorrected.nii",
+            uni,
+            output_dir,
+            reporter,
+            started,
         )
-        output = output_dir / f"{nii_stem(uni)}_MPRAGEised.nii"
-        nib.save(
-            nib.Nifti1Image(uni_data * normalised, uni_img.affine, uni_img.header),
-            str(output),
-        )
-        report_stage(reporter, "MPRAGEise complete", started)
-        return output
     finally:
         shutil.rmtree(bias_dir.parent, ignore_errors=True)
         report_stage(reporter, "Removed temporary bias-correction stage", started)
+
+
+def recon_prep(
+    inv2: Path,
+    uni: Path,
+    container: Container,
+    *,
+    threads: int | None = None,
+    reporter: StageReporter | None = None,
+) -> Path:
+    """Prepare INV2 and UNI for FreeSurfer in one run with two segmentations.
+
+    The strip-mask segmentation of INV2 also produces a bias-corrected INV2.
+    That image is reused for MPRAGEise, so no separate bias-correction run is
+    needed. The brain-mask segmentation then runs on the MPRAGEised UNI.
+
+    All three workflows write into one timestamped run directory.
+
+    Args:
+        inv2: INV2 ``.nii`` or ``.nii.gz`` input file.
+        uni: UNI ``.nii`` or ``.nii.gz`` input file.
+        container: Runtime and image to run SPM in.
+        threads: Number of MATLAB computational threads, or ``None`` to keep
+            the MATLAB default.
+        reporter: Optional recipient for progress messages.
+
+    Returns:
+        Run directory holding ``presurf_INV2``, ``presurf_MPRAGEise``, and
+        ``presurf_UNI``.
+
+    Raises:
+        RuntimeError: If an input is missing or not a NIfTI file, the images do
+            not share a voxel grid, or SPM fails.
+    """
+    started = time.monotonic()
+    inv2 = inv2.resolve()
+    uni = uni.resolve()
+    if not inv2.is_file() or not uni.is_file():
+        raise RuntimeError("Both INV2 and UNI inputs must be existing files.")
+    nii_stem(inv2)
+    nii_stem(uni)
+    _check_matching_grids(inv2, uni)
+    report_stage(reporter, "Validated recon-prep inputs", started)
+    run_dir = utc_run_directory(inv2.parent)
+    inv2_out = run_segmentation(
+        inv2, "INV2", container, threads=threads, run_dir=run_dir, reporter=reporter
+    )
+    output_dir = run_dir / "presurf_MPRAGEise"
+    output_dir.mkdir()
+    mprageised = _combine_mprageise(
+        inv2_out / f"{nii_stem(inv2)}_biascorrected.nii",
+        uni,
+        output_dir,
+        reporter,
+        started,
+    )
+    run_segmentation(
+        mprageised,
+        "UNI",
+        container,
+        threads=threads,
+        run_dir=run_dir,
+        reporter=reporter,
+    )
+    report_stage(reporter, "recon-prep complete", started)
+    return run_dir
 
 
 def presurf_biascorrect(
@@ -356,6 +470,48 @@ def presurf_mprageise(
         RuntimeError: If SPM bias correction or image processing fails.
     """
     return mprageise(
+        Path(inv2_file),
+        Path(uni_file),
+        Container(runtime, image),
+        threads=default_threads() if threads is None else threads,
+    )
+
+
+def presurf_recon_prep(
+    inv2_file: str | Path,
+    uni_file: str | Path,
+    *,
+    image: str = IMAGE,
+    runtime: Runtime = "docker",
+    threads: int | None = None,
+) -> Path:
+    """Prepare INV2 and UNI for FreeSurfer with two SPM segmentations.
+
+    Runs the strip-mask workflow on INV2, reuses its bias-corrected image for
+    MPRAGEise, then runs the brain-mask workflow on the MPRAGEised UNI. This
+    skips the separate bias-correction run that ``presurf_mprageise`` needs.
+
+    The bias correction comes from the 2 mm strip-mask segmentation rather than
+    the 3 mm sampling that ``presurf_mprageise`` uses, so the MPRAGEised image
+    can differ slightly from the one that function produces.
+
+    Args:
+        inv2_file: Path to the INV2 ``.nii`` or ``.nii.gz`` image.
+        uni_file: Path to the UNI ``.nii`` or ``.nii.gz`` image.
+        image: Docker image tag or local Apptainer image path. Defaults to the
+            pinned official SPM25 Docker image.
+        runtime: ``"docker"`` or ``"apptainer"``. Defaults to ``"docker"``.
+        threads: Number of MATLAB computational threads. Defaults to the number
+            of available cores, between 8 and 16.
+
+    Returns:
+        Path to the run directory holding ``presurf_INV2``,
+        ``presurf_MPRAGEise``, and ``presurf_UNI``.
+
+    Raises:
+        RuntimeError: If input validation or SPM execution fails.
+    """
+    return recon_prep(
         Path(inv2_file),
         Path(uni_file),
         Container(runtime, image),

@@ -5,6 +5,7 @@ from presurfer.presurfer_workflows import (
     SIF_IMAGE,
     presurf_biascorrect,
     presurf_mprageise,
+    presurf_recon_prep,
     presurf_seg,
     presurf_stripmask,
 )
@@ -14,6 +15,7 @@ __all__ = [
     "SIF_IMAGE",
     "presurf_biascorrect",
     "presurf_mprageise",
+    "presurf_recon_prep",
     "presurf_seg",
     "presurf_stripmask",
 ]
