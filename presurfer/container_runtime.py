@@ -134,6 +134,7 @@ def container_command(
         "--bind",
         f"{mount_root.resolve()}:/data",
         container.image,
+        "spm",
         "batch",
         job,
     ]
