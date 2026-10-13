@@ -247,9 +247,12 @@ def test_apptainer_engine_defaults_to_registry_image(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seen: list[Container] = []
-    monkeypatch.setattr(
-        command_line, "check_container", lambda c: seen.append(c) or "ok"
-    )
+
+    def fake_check(container: Container) -> str:
+        seen.append(container)
+        return "ok"
+
+    monkeypatch.setattr(command_line, "check_container", fake_check)
     result = CliRunner().invoke(command_line.main, ["--engine", "apptainer", "--check"])
     assert result.exit_code == 0, result.output
     assert seen[0].runtime == "apptainer"
@@ -542,11 +545,12 @@ def test_check_matching_grids_rejects_different_affines(tmp_path: Path) -> None:
 def test_pull_sif(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[list[str]] = []
     monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/apptainer")
-    monkeypatch.setattr(
-        subprocess,
-        "run",
-        lambda cmd, **_: calls.append(cmd) or subprocess.CompletedProcess(cmd, 0),
-    )
+
+    def fake_run(cmd: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
     out = tmp_path / "spm.sif"
     result = CliRunner().invoke(command_line.main, ["pull", "--output", str(out)])
     assert result.exit_code == 0, result.output
