@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- With Apptainer, `--image` accepts a bare registry name such as
+  `ghcr.io/org/image:tag` and adds the `docker://` prefix.
+- Running an Apptainer registry image prints a note that Apptainer converts it
+  on every run, and suggests `presurfer pull` with `--sif`.
+- `presurfer --sif FILE pull` now says that `pull` cannot use `--sif`.
+
 ### Fixed
 
 - Docker runs now work for any user id. The SPM image has a home directory only

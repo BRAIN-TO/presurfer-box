@@ -13,6 +13,7 @@ from presurfer.container_runtime import (
     SIF_IMAGE,
     Container,
     check_container,
+    is_registry_image,
     pull_sif,
 )
 from presurfer.presurfer_workflows import (
@@ -118,6 +119,14 @@ def main(
     ctx.obj["image"] = str(sif) if sif else (image or IMAGE)
     ctx.obj["runtime"] = engine or ("apptainer" if sif else "docker")
     ctx.obj["threads"] = threads
+    if ctx.invoked_subcommand != "pull" and ctx.obj["runtime"] == "apptainer":
+        shown = Container("apptainer", ctx.obj["image"]).image
+        if is_registry_image(shown) and (check_ or ctx.invoked_subcommand):
+            click.echo(
+                "Note: Apptainer converts a registry image on every run. "
+                "For repeated use, run `presurfer pull` once and pass --sif.",
+                err=True,
+            )
     if check_:
         try:
             container = Container(ctx.obj["runtime"], ctx.obj["image"])
@@ -144,6 +153,8 @@ def cmd_pull(ctx: click.Context, output: Path, force: bool) -> None:
 
     Uses the default SPM image, or the registry URI given to --image.
     """
+    if ctx.parent is not None and ctx.parent.params.get("sif"):
+        raise click.UsageError("pull downloads an image, so it cannot use --sif.")
     image = Container("apptainer", ctx.obj["image"]).image
     try:
         pull_sif(image, output, force=force)

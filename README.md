@@ -166,7 +166,8 @@ presurfer --sif spm.sif stripmask INV2.nii
 ```
 
 To use a different image, pass `--image IMAGE` (a Docker tag, or with Apptainer
-a registry URI such as `docker://...`). `--image` and `--sif` cannot be combined.
+a registry name such as `ghcr.io/org/image:tag`, with or without `docker://`).
+`--image` and `--sif` cannot be combined.
 
 ### Container engine
 

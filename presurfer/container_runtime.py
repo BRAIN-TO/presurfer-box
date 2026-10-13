@@ -20,10 +20,40 @@ __all__ = [
     "Container",
     "Runtime",
     "check_container",
-    "pull_sif",
     "container_command",
+    "is_registry_image",
+    "pull_sif",
     "run_spm_batch",
 ]
+
+
+def _is_registry_name(image: str) -> bool:
+    """Tell whether an Apptainer image is a bare registry name like ``ghcr.io/x:y``.
+
+    Args:
+        image: Image string given by the user.
+
+    Returns:
+        True if it has no URI scheme, is not an existing file, and does not end
+        in ``.sif`` or ``.simg``.
+    """
+    return not (
+        image.startswith(REGISTRY_SCHEMES)
+        or image.endswith((".sif", ".simg"))
+        or Path(image).is_file()
+    )
+
+
+def is_registry_image(image: str) -> bool:
+    """Tell whether an image is a registry URI that Apptainer converts per run.
+
+    Args:
+        image: Image string held by a ``Container``.
+
+    Returns:
+        True for ``docker://``, ``oras://``, ``library://`` and ``shub://`` URIs.
+    """
+    return image.startswith(REGISTRY_SCHEMES)
 
 
 @dataclass(frozen=True)
@@ -33,7 +63,8 @@ class Container:
     Attributes:
         runtime: ``"docker"`` or ``"apptainer"``.
         image: Docker image tag, or for Apptainer a local image path or registry
-            URI. The default ``IMAGE`` becomes ``docker://IMAGE`` for Apptainer.
+            URI. A bare registry name such as the default ``IMAGE`` gets a
+            ``docker://`` prefix for Apptainer.
 
     Raises:
         RuntimeError: If ``runtime`` is not supported.
@@ -48,8 +79,8 @@ class Container:
             raise RuntimeError(
                 f"Unsupported runtime: {self.runtime}. Use 'docker' or 'apptainer'."
             )
-        if self.runtime == "apptainer" and self.image == IMAGE:
-            object.__setattr__(self, "image", f"docker://{IMAGE}")
+        if self.runtime == "apptainer" and _is_registry_name(self.image):
+            object.__setattr__(self, "image", f"docker://{self.image}")
 
 
 def _require_docker_image(image: str) -> None:

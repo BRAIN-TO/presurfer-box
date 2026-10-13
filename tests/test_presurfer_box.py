@@ -282,6 +282,33 @@ def test_apptainer_check_runs_spm_version(monkeypatch: pytest.MonkeyPatch) -> No
     ]
 
 
+def test_apptainer_bare_registry_name_gets_docker_prefix(tmp_path: Path) -> None:
+    assert Container("apptainer", "ghcr.io/x/y:z").image == "docker://ghcr.io/x/y:z"
+    assert (
+        Container("apptainer", "oras://ghcr.io/x/y:z").image == "oras://ghcr.io/x/y:z"
+    )
+    assert Container("apptainer", "missing.sif").image == "missing.sif"
+    local = tmp_path / "image"
+    local.touch()
+    assert Container("apptainer", str(local)).image == str(local)
+
+
+def test_pull_rejects_sif_and_registry_runs_note_conversion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sif = tmp_path / "spm.sif"
+    sif.touch()
+    runner = CliRunner()
+    bad = runner.invoke(command_line.main, ["--sif", str(sif), "pull"])
+    assert bad.exit_code != 0
+    assert "cannot use --sif" in bad.output
+    monkeypatch.setattr(command_line, "check_container", lambda _: "ok")
+    registry = runner.invoke(command_line.main, ["--engine", "apptainer", "--check"])
+    assert "converts a registry image on every run" in registry.output
+    local = runner.invoke(command_line.main, ["--sif", str(sif), "--check"])
+    assert "converts a registry image" not in local.output
+
+
 def test_unsupported_runtime_is_rejected() -> None:
     with pytest.raises(RuntimeError, match="Unsupported runtime"):
         Container("singularity", "image")  # type: ignore[arg-type]
@@ -582,6 +609,9 @@ def test_pull_sif(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert custom.exit_code == 0, custom.output
     assert calls[-1][-1] == "docker://ghcr.io/x/y:z"
-    bare = CliRunner().invoke(command_line.main, ["--image", "ghcr.io/x/y:z", "pull"])
-    assert bare.exit_code != 0
-    assert "Not a registry image" in bare.output
+    bare = CliRunner().invoke(
+        command_line.main,
+        ["--image", "ghcr.io/x/y:z", "pull", "--output", str(out), "--force"],
+    )
+    assert bare.exit_code == 0, bare.output
+    assert calls[-1][-1] == "docker://ghcr.io/x/y:z"
