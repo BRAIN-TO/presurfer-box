@@ -1,4 +1,4 @@
-# presurfer-box [![Version](https://img.shields.io/badge/version-2.4.8-purple.svg)](https://github.com/srikash/presurfer-box/releases/tag/v2.4.8) [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE) [![CI](https://github.com/srikash/presurfer-box/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/srikash/presurfer-box/actions/workflows/ci.yml) [![DOI](https://zenodo.org/badge/1350566808.svg)](https://doi.org/10.5281/zenodo.22163094)
+# presurfer-box [![Version](https://img.shields.io/badge/version-2.4.9-purple.svg)](https://github.com/srikash/presurfer-box/releases/tag/v2.4.9) [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE) [![CI](https://github.com/srikash/presurfer-box/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/srikash/presurfer-box/actions/workflows/ci.yml) [![DOI](https://zenodo.org/badge/1350566808.svg)](https://doi.org/10.5281/zenodo.22163094)
 
 MATLAB-free MP2RAGE preprocessing for [presurfer](https://github.com/srikash/presurfer),
 using SPM Standalone in a Docker or Apptainer container.
@@ -110,15 +110,15 @@ apptainer pull --name spm.sif \
 presurfer --engine apptainer --sif spm.sif --check
 ```
 
-Apptainer can also pull from the registry itself, so a `.sif` file is optional:
+Apptainer can pull from the registry itself, so you don't need a `.sif` file:
 
 ```bash
 presurfer --engine apptainer --image docker://ghcr.io/spm/spm-docker:docker-matlab-25.01.02 --check
 ```
 
-Apptainer converts the image on each run this way (it caches the layers in
-`~/.apptainer/cache`, or `$APPTAINER_CACHEDIR`). On a cluster, pulling a
-`.sif` once is faster. `presurfer pull` does this for you:
+This way Apptainer converts the image on every run, though it caches the
+downloaded layers in `~/.apptainer/cache` (or `$APPTAINER_CACHEDIR`). On a
+cluster it is faster to pull a `.sif` once. `presurfer pull` does that:
 
 ```bash
 presurfer pull --output /data/containers/spm.sif   # default: ./spm.sif
@@ -152,8 +152,8 @@ presurfer recon-prep INV2.nii UNI.nii
 ```
 
 Inputs can be `.nii` or `.nii.gz`. Docker is the default runtime. To use
-Apptainer, pass `--engine apptainer` before the command. It pulls the default
-SPM image from `ghcr.io` itself:
+Apptainer, pass `--engine apptainer` before the command. Apptainer pulls the
+default SPM image from `ghcr.io` on its own:
 
 ```bash
 presurfer --engine apptainer stripmask INV2.nii
