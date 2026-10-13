@@ -11,6 +11,7 @@ from presurfer.output_paths import container_path
 
 IMAGE = "ghcr.io/spm/spm-docker:docker-matlab-25.01.02"
 SIF_IMAGE = "spm.sif"
+REGISTRY_SCHEMES = ("docker://", "oras://", "library://", "shub://")
 Runtime = Literal["docker", "apptainer"]
 
 __all__ = [
@@ -19,6 +20,7 @@ __all__ = [
     "Container",
     "Runtime",
     "check_container",
+    "pull_sif",
     "container_command",
     "run_spm_batch",
 ]
@@ -30,7 +32,8 @@ class Container:
 
     Attributes:
         runtime: ``"docker"`` or ``"apptainer"``.
-        image: Docker image tag, or the path to a local Apptainer image.
+        image: Docker image tag, or for Apptainer a local image path or registry
+            URI. The default ``IMAGE`` becomes ``docker://IMAGE`` for Apptainer.
 
     Raises:
         RuntimeError: If ``runtime`` is not supported.
@@ -45,6 +48,8 @@ class Container:
             raise RuntimeError(
                 f"Unsupported runtime: {self.runtime}. Use 'docker' or 'apptainer'."
             )
+        if self.runtime == "apptainer" and self.image == IMAGE:
+            object.__setattr__(self, "image", f"docker://{IMAGE}")
 
 
 def _require_docker_image(image: str) -> None:
@@ -74,10 +79,13 @@ def _require_docker_image(image: str) -> None:
 
 
 def _apptainer_executable(image: str) -> str:
-    """Find Apptainer and check that the image file exists.
+    """Find Apptainer and check that a local image file exists.
+
+    Registry images (``docker://``, ``oras://``, ...) are left for Apptainer to
+    pull, so they are not checked.
 
     Args:
-        image: Path to a local Apptainer image.
+        image: Path to a local Apptainer image, or a registry URI.
 
     Returns:
         Path to the ``apptainer`` executable.
@@ -88,13 +96,48 @@ def _apptainer_executable(image: str) -> str:
     executable = shutil.which("apptainer")
     if executable is None:
         raise RuntimeError("Apptainer was not found on PATH.")
-    if not Path(image).is_file():
+    if not image.startswith(REGISTRY_SCHEMES) and not Path(image).is_file():
         raise RuntimeError(
             f"Apptainer image does not exist: {image}\n"
             f"Pull it first: apptainer pull --name {SIF_IMAGE} "
             "oras://ghcr.io/spm/spm-docker:singularity-matlab-25.01.02"
         )
     return executable
+
+
+def pull_sif(image: str, output: Path, *, force: bool = False) -> Path:
+    """Pull a registry image into a local Apptainer SIF file for reuse.
+
+    Args:
+        image: Registry URI such as ``docker://ghcr.io/...``.
+        output: Path of the SIF file to write.
+        force: Whether to overwrite an existing file.
+
+    Returns:
+        Path to the written SIF file.
+
+    Raises:
+        RuntimeError: If Apptainer is unavailable, the image is not a registry
+            URI, the file exists without ``force``, or the pull fails.
+    """
+    if not image.startswith(REGISTRY_SCHEMES):
+        raise RuntimeError(
+            f"Not a registry image: {image}\n"
+            "Use a URI such as docker://ghcr.io/spm/spm-docker:..."
+        )
+    executable = shutil.which("apptainer")
+    if executable is None:
+        raise RuntimeError("Apptainer was not found on PATH.")
+    if output.exists() and not force:
+        raise RuntimeError(f"{output} already exists. Use --force to overwrite it.")
+    command = [executable, "pull"]
+    if force:
+        command.append("--force")
+    command += [str(output), image]
+    result = subprocess.run(command, check=False)
+    if result.returncode:
+        raise RuntimeError(f"apptainer pull failed (exit status {result.returncode}).")
+    return output
 
 
 def container_command(

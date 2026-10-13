@@ -335,7 +335,7 @@ def presurf_biascorrect(
 
     Args:
         input_file: Path to a ``.nii`` or ``.nii.gz`` image.
-        image: Docker image tag or local Apptainer image path. Defaults to the
+        image: Docker image tag, or Apptainer image path or registry URI. Defaults to the
             pinned official SPM25 Docker image.
         runtime: ``"docker"`` or ``"apptainer"``. Defaults to ``"docker"``.
         threads: Number of MATLAB computational threads. Defaults to the number
@@ -364,7 +364,7 @@ def presurf_mprageise(
     Args:
         inv2_file: Path to the INV2 ``.nii`` or ``.nii.gz`` image.
         uni_file: Path to the UNI ``.nii`` or ``.nii.gz`` image.
-        image: Docker image tag or local Apptainer image path. Defaults to the
+        image: Docker image tag, or Apptainer image path or registry URI. Defaults to the
             pinned official SPM25 Docker image.
         runtime: ``"docker"`` or ``"apptainer"``. Defaults to ``"docker"``.
         threads: Number of MATLAB computational threads. Defaults to the number
@@ -404,7 +404,7 @@ def presurf_recon_prep(
     Args:
         inv2_file: Path to the INV2 ``.nii`` or ``.nii.gz`` image.
         uni_file: Path to the UNI ``.nii`` or ``.nii.gz`` image.
-        image: Docker image tag or local Apptainer image path. Defaults to the
+        image: Docker image tag, or Apptainer image path or registry URI. Defaults to the
             pinned official SPM25 Docker image.
         runtime: ``"docker"`` or ``"apptainer"``. Defaults to ``"docker"``.
         threads: Number of MATLAB computational threads. Defaults to the number
@@ -432,7 +432,7 @@ def presurf_stripmask(
 
     Args:
         input_file: Path to an INV2 ``.nii`` or ``.nii.gz`` image.
-        image: Docker image tag or local Apptainer image path. Defaults to the
+        image: Docker image tag, or Apptainer image path or registry URI. Defaults to the
             pinned official SPM25 Docker image.
         runtime: ``"docker"`` or ``"apptainer"``. Defaults to ``"docker"``.
         threads: Number of MATLAB computational threads. Defaults to the number
@@ -459,7 +459,7 @@ def presurf_seg(
 
     Args:
         input_file: Path to a UNI ``.nii`` or ``.nii.gz`` image.
-        image: Docker image tag or local Apptainer image path. Defaults to the
+        image: Docker image tag, or Apptainer image path or registry URI. Defaults to the
             pinned official SPM25 Docker image.
         runtime: ``"docker"`` or ``"apptainer"``. Defaults to ``"docker"``.
         threads: Number of MATLAB computational threads. Defaults to the number

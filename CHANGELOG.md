@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `presurfer pull` saves the SPM image as a local SIF file for reuse with
+  `--sif`.
+
+### Changed
+
+- `--engine apptainer` no longer needs `--sif`. It accepts `--image` with a
+  registry URI (`docker://`, `oras://`) that Apptainer pulls itself, and uses
+  the default SPM image from `ghcr.io` when neither is given.
+
 ## [2.4.8] - 2026-10-10
 
 ### Fixed

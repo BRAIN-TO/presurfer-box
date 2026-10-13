@@ -110,6 +110,25 @@ apptainer pull --name spm.sif \
 presurfer --engine apptainer --sif spm.sif --check
 ```
 
+Apptainer can also pull from the registry itself, so a `.sif` file is optional:
+
+```bash
+presurfer --engine apptainer --image docker://ghcr.io/spm/spm-docker:docker-matlab-25.01.02 --check
+```
+
+Apptainer converts the image on each run this way (it caches the layers in
+`~/.apptainer/cache`, or `$APPTAINER_CACHEDIR`). On a cluster, pulling a
+`.sif` once is faster. `presurfer pull` does this for you:
+
+```bash
+presurfer pull --output /data/containers/spm.sif   # default: ./spm.sif
+presurfer --sif /data/containers/spm.sif --check
+```
+
+`pull` uses the default SPM image, or a registry URI given with `--image`
+(`presurfer --image docker://... pull`). It refuses to overwrite an existing
+file unless you add `--force`.
+
 A successful check prints the runtime,
 the image, and the SPM version.
 
@@ -132,21 +151,29 @@ presurfer brainmask UNI.nii
 presurfer recon-prep INV2.nii UNI.nii
 ```
 
-Inputs can be `.nii` or `.nii.gz`. Docker is the default runtime. To use a local
-Apptainer image, pass `--engine apptainer --sif IMAGE` before the command:
+Inputs can be `.nii` or `.nii.gz`. Docker is the default runtime. To use
+Apptainer, pass `--engine apptainer` before the command. It pulls the default
+SPM image from `ghcr.io` itself:
 
 ```bash
-presurfer --engine apptainer --sif spm.sif stripmask INV2.nii
+presurfer --engine apptainer stripmask INV2.nii
 ```
 
-To use a different Docker image, pass `--image IMAGE` instead. `--image` and
-`--sif` cannot be combined.
+To reuse a local Apptainer image, pass `--sif IMAGE` (see `presurfer pull` above):
+
+```bash
+presurfer --sif spm.sif stripmask INV2.nii
+```
+
+To use a different image, pass `--image IMAGE` (a Docker tag, or with Apptainer
+a registry URI such as `docker://...`). `--image` and `--sif` cannot be combined.
 
 ### Container engine
 
-`--engine` chooses between `docker` (the default) and `apptainer`. Apptainer
-needs a local SIF file, so `--engine apptainer` must be used with `--sif`.
-Passing `--sif` alone selects Apptainer automatically.
+`--engine` chooses between `docker` (the default) and `apptainer`. With
+Apptainer, give either a local SIF file (`--sif`) or a registry URI such as
+`docker://ghcr.io/...` (`--image`). `--engine apptainer` alone uses the default
+SPM image from `ghcr.io`. Passing `--sif` alone selects Apptainer automatically.
 
 ```bash
 presurfer --engine apptainer --sif spm.sif brainmask UNI.nii
@@ -223,9 +250,12 @@ presurf_recon_prep("INV2.nii", "UNI.nii")
 ```
 
 Every function accepts the optional keywords `image=`, `runtime=`, and
-`threads=`. For Apptainer, pass the local SIF path as `image=`:
+`threads=`. For Apptainer, `runtime="apptainer"` alone uses the default SPM
+image from `ghcr.io`. Pass a local SIF path or a registry URI as `image=` to
+override it:
 
 ```python
+presurf_stripmask("INV2.nii", runtime="apptainer")
 presurf_stripmask("INV2.nii", image="spm.sif", runtime="apptainer")
 ```
 

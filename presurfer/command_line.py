@@ -8,7 +8,13 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from presurfer.container_runtime import IMAGE, Container, check_container
+from presurfer.container_runtime import (
+    IMAGE,
+    SIF_IMAGE,
+    Container,
+    check_container,
+    pull_sif,
+)
 from presurfer.presurfer_workflows import (
     presurf_biascorrect,
     presurf_mprageise,
@@ -52,11 +58,17 @@ def _invoke_workflow(
     context_settings={"help_option_names": ["-h", "--help"]},
     invoke_without_command=True,
 )
-@click.option("--image", help="Docker image tag. Docker is the default runtime.")
+@click.option(
+    "--image",
+    help=(
+        "Docker image tag, or with --engine apptainer a registry URI such as "
+        "docker://ghcr.io/... that Apptainer pulls itself."
+    ),
+)
 @click.option(
     "--sif",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    help="Apptainer SIF file. Implies --engine apptainer.",
+    help="Local Apptainer SIF file. Implies --engine apptainer.",
 )
 @click.option(
     "--engine",
@@ -89,7 +101,7 @@ def main(
     \f
     Args:
         ctx: Click context used to pass selected runtime configuration.
-        image: Optional Docker image tag.
+        image: Optional Docker image tag or Apptainer registry URI.
         sif: Optional local Apptainer SIF path.
         engine: Optional container engine: ``docker`` or ``apptainer``.
         threads: Optional MATLAB thread count.
@@ -102,8 +114,6 @@ def main(
         raise click.UsageError("Use either --image or --sif, not both.")
     if engine == "docker" and sif:
         raise click.UsageError("--sif cannot be used with --engine docker.")
-    if engine == "apptainer" and not sif:
-        raise click.UsageError("--engine apptainer needs --sif.")
     ctx.ensure_object(dict)
     ctx.obj["image"] = str(sif) if sif else (image or IMAGE)
     ctx.obj["runtime"] = engine or ("apptainer" if sif else "docker")
@@ -117,6 +127,30 @@ def main(
         ctx.exit()
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
+
+
+@main.command(name="pull")
+@click.option(
+    "--output",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=Path(SIF_IMAGE),
+    show_default=True,
+    help="SIF file to write.",
+)
+@click.option("--force", is_flag=True, help="Overwrite an existing SIF file.")
+@click.pass_context
+def cmd_pull(ctx: click.Context, output: Path, force: bool) -> None:
+    """Pull the SPM image into a local SIF file for reuse with --sif.
+
+    Uses the default SPM image, or the registry URI given to --image.
+    """
+    image = Container("apptainer", ctx.obj["image"]).image
+    try:
+        pull_sif(image, output, force=force)
+    except RuntimeError as error:
+        raise click.ClickException(str(error)) from error
+    CONSOLE.print(f"[green]Saved[/green] {output}")
+    CONSOLE.print(f"Use it with: presurfer --sif {output} <command>")
 
 
 @main.command(name="biascorrect")

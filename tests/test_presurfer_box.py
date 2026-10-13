@@ -6,6 +6,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
@@ -230,6 +231,39 @@ def test_apptainer_image_must_exist(
         )
 
 
+def test_apptainer_registry_image_is_not_file_checked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job = tmp_path / "job.m"
+    job.touch()
+    monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/apptainer")
+    command = container_runtime.container_command(
+        tmp_path, job, Container("apptainer", "docker://ghcr.io/spm/spm-docker:x")
+    )
+    assert "docker://ghcr.io/spm/spm-docker:x" in command
+
+
+def test_apptainer_engine_defaults_to_registry_image(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[Container] = []
+    monkeypatch.setattr(
+        command_line, "check_container", lambda c: seen.append(c) or "ok"
+    )
+    result = CliRunner().invoke(command_line.main, ["--engine", "apptainer", "--check"])
+    assert result.exit_code == 0, result.output
+    assert seen[0].runtime == "apptainer"
+    assert seen[0].image == f"docker://{container_runtime.IMAGE}"
+
+
+def test_apptainer_default_image_is_registry_uri() -> None:
+    assert Container("apptainer", container_runtime.IMAGE).image == (
+        f"docker://{container_runtime.IMAGE}"
+    )
+    assert Container("docker", container_runtime.IMAGE).image == container_runtime.IMAGE
+    assert Container("apptainer", "my.sif").image == "my.sif"
+
+
 def test_unsupported_runtime_is_rejected() -> None:
     with pytest.raises(RuntimeError, match="Unsupported runtime"):
         Container("singularity", "image")  # type: ignore[arg-type]
@@ -239,9 +273,6 @@ def test_engine_option_validation(tmp_path: Path) -> None:
     sif = tmp_path / "spm.sif"
     sif.touch()
     runner = CliRunner()
-    needs_sif = runner.invoke(command_line.main, ["--engine", "apptainer", "--check"])
-    assert needs_sif.exit_code != 0
-    assert "needs --sif" in needs_sif.output
     docker_sif = runner.invoke(
         command_line.main, ["--engine", "docker", "--sif", str(sif), "--check"]
     )
@@ -506,3 +537,32 @@ def test_check_matching_grids_rejects_different_affines(tmp_path: Path) -> None:
     check_matching_grids(tmp_path / "a.nii", tmp_path / "a.nii")
     with pytest.raises(RuntimeError, match="matching spatial affines"):
         check_matching_grids(tmp_path / "a.nii", tmp_path / "b.nii")
+
+
+def test_pull_sif(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[list[str]] = []
+    monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/apptainer")
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda cmd, **_: calls.append(cmd) or subprocess.CompletedProcess(cmd, 0),
+    )
+    out = tmp_path / "spm.sif"
+    result = CliRunner().invoke(command_line.main, ["pull", "--output", str(out)])
+    assert result.exit_code == 0, result.output
+    assert calls == [
+        ["/usr/bin/apptainer", "pull", str(out), f"docker://{container_runtime.IMAGE}"]
+    ]
+    out.touch()
+    again = CliRunner().invoke(command_line.main, ["pull", "--output", str(out)])
+    assert again.exit_code != 0
+    assert "--force" in again.output
+    custom = CliRunner().invoke(
+        command_line.main,
+        ["--image", "docker://ghcr.io/x/y:z", "pull", "--output", str(out), "--force"],
+    )
+    assert custom.exit_code == 0, custom.output
+    assert calls[-1][-1] == "docker://ghcr.io/x/y:z"
+    bare = CliRunner().invoke(command_line.main, ["--image", "ghcr.io/x/y:z", "pull"])
+    assert bare.exit_code != 0
+    assert "Not a registry image" in bare.output
