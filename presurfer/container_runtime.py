@@ -210,7 +210,7 @@ def check_container(container: Container) -> str:
         label = "Docker image"
     else:
         executable = _apptainer_executable(container.image)
-        command = [executable, "exec", container.image, "--version"]
+        command = [executable, "exec", container.image, "spm", "--version"]
         label = f"{Path(executable).name.capitalize()} image"
 
     result = subprocess.run(command, check=False, text=True, capture_output=True)

@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- Apptainer runs and `--check` now start SPM through its `spm` command.
+  `apptainer exec` skips the image's entry point, so `batch` and `--version`
+  were run as program names. Thanks to Will Foran for the report and fix
+  (#3).
+
 ## [2.4.9] - 2026-10-13
 
 ### Added

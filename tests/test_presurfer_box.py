@@ -267,6 +267,21 @@ def test_apptainer_default_image_is_registry_uri() -> None:
     assert Container("apptainer", "my.sif").image == "my.sif"
 
 
+def test_apptainer_check_runs_spm_version(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[list[str]] = []
+
+    def fake_run(cmd: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        seen.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="SPM25\n", stderr="")
+
+    monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/apptainer")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    container_runtime.check_container(Container("apptainer", "docker://x/y:z"))
+    assert seen == [
+        ["/usr/bin/apptainer", "exec", "docker://x/y:z", "spm", "--version"]
+    ]
+
+
 def test_unsupported_runtime_is_rejected() -> None:
     with pytest.raises(RuntimeError, match="Unsupported runtime"):
         Container("singularity", "image")  # type: ignore[arg-type]

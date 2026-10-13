@@ -5,6 +5,7 @@
     "--bind",
     "/tmp/mnt:/data",
     "/tmp/mnt/spm.sif",
+    "spm",
     "batch",
     "/data/job.m"
   ],
