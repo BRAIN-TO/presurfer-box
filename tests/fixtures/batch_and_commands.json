@@ -15,6 +15,8 @@
     "--rm",
     "--user",
     "1000:1000",
+    "-e",
+    "HOME=/tmp",
     "-v",
     "/tmp/mnt:/data",
     "img:tag",

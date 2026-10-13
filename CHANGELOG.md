@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Docker runs now work for any user id. The SPM image has a home directory only
+  for uid 1000, so other users got `HOME=/` and MATLAB failed with
+  `fl:filesystem:AccessDenied`. The container now sets `HOME=/tmp` (#1).
 - Apptainer runs and `--check` now start SPM through its `spm` command.
   `apptainer exec` skips the image's entry point, so `batch` and `--version`
   were run as program names. Thanks to Will Foran for the report and fix

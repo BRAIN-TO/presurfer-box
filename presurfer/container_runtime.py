@@ -159,12 +159,16 @@ def container_command(
     """
     job = container_path(job_file, mount_root)
     if container.runtime == "docker":
+        # The image has a home directory only for uid 1000. Any other uid gets
+        # HOME=/, and MATLAB fails with fl:filesystem:AccessDenied.
         return [
             "docker",
             "run",
             "--rm",
             "--user",
             f"{os.getuid()}:{os.getgid()}",
+            "-e",
+            "HOME=/tmp",
             "-v",
             f"{mount_root.resolve()}:/data",
             container.image,
@@ -204,6 +208,8 @@ def check_container(container: Container) -> str:
             "--rm",
             "--user",
             f"{os.getuid()}:{os.getgid()}",
+            "-e",
+            "HOME=/tmp",
             container.image,
             "--version",
         ]
